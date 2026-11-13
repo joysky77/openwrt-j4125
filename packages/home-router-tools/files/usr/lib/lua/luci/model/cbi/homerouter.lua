@@ -3,7 +3,11 @@ local s = m:section(NamedSection, "child", "child", "夜间控制")
 local enabled = s:option(Flag, "enabled", "启用")
 enabled.default = "0"
 local lan = s:option(Value, "lan_device", "LAN 桥接口")
-lan.datatype = "networkdevicename"
+lan.datatype = "string"
+function lan.validate(self, value, section)
+    if value and #value <= 15 and value:match("^[%w_.:%-]+$") then return value end
+    return nil, "请输入有效的 Linux 接口名（最多 15 个字符）"
+end
 lan.default = "br-lan"
 local resume = s:option(Value, "resume_hour", "早晨恢复时间（整点）")
 resume.datatype = "range(1,23)"
