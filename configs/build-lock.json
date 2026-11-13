@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "firmware_version": "0.1.0-rc1",
+  "openwrt_release": "25.12.6",
+  "openwrt": {"url": "https://github.com/openwrt/openwrt.git", "commit": "64900e756efa667774214f9c6b17c113222e01f7"},
+  "feeds": {
+    "packages": {"url": "https://github.com/openwrt/packages.git", "commit": "093d551675b1119a06ef224d419905e8d6b2af1a"},
+    "luci": {"url": "https://github.com/openwrt/luci.git", "commit": "75a306df84a020c57a631ef5b4c02ace56d93387"},
+    "routing": {"url": "https://github.com/openwrt/routing.git", "commit": "48c808034414a2112cf9d5261a20a320e8d0d170"},
+    "passwall_packages": {"url": "https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git", "commit": "b094b79c32ac4e4de3113a5c44971c6182eee535"},
+    "passwall2": {"url": "https://github.com/Openwrt-Passwall/openwrt-passwall2.git", "commit": "24baf7cffdb34272adb8f8b31d6ad901596c3f61"}
+  },
+  "actions": {
+    "checkout": "11d5960a326750d5838078e36cf38b85af677262",
+    "upload_artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "target": "x86/64",
+  "minimum_build_free_gib": 30,
+  "minimum_build_memory_gib": 6
+}

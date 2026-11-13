@@ -1,0 +1,19 @@
+name: Validate build project
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, pinned
+      - name: Project and regression checks
+        run: |
+          python3 scripts/project.py validate
+          python3 -m unittest discover -s tests -v
+          bash -n scripts/build.sh
+          find packages -type f \( -name '*.sh' -o -path '*/init.d/*' -o -path '*/uci-defaults/*' \) -exec sh -n {} \;

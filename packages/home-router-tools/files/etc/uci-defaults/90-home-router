@@ -1,0 +1,29 @@
+#!/bin/sh
+# No user secrets, device addresses, NAS credentials or partition mutations.
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci set firewall.@defaults[0].flow_offloading='0'
+uci set firewall.@defaults[0].flow_offloading_hw='0'
+uci commit system
+uci commit firewall
+# Installed capabilities are provisioned separately; retain base DNS/DHCP.
+for service in dockerd transmission adguardhome passwall2 zerotier miniupnpd p910nd ttyd librespeed; do
+	[ ! -x "/etc/init.d/$service" ] || "/etc/init.d/$service" disable
+done
+uci -q set dockerd.globals.data_root='/srv/data/docker'
+uci -q commit dockerd
+uci -q set transmission.@transmission[0].enabled='0'
+uci -q set transmission.@transmission[0].download_dir='/mnt/nas-downloads/complete'
+uci -q set transmission.@transmission[0].incomplete_dir='/mnt/nas-downloads/incomplete'
+uci -q set transmission.@transmission[0].incomplete_dir_enabled='true'
+uci -q set transmission.@transmission[0].config_dir='/srv/data/appdata/transmission'
+uci -q commit transmission
+uci set ucitrack.homerouter='homerouter'
+uci set ucitrack.homerouter.init='home-child-policy'
+uci commit ucitrack
+uci set commands.home_status='command'
+uci set commands.home_status.name='家庭路由：服务与磁盘状态'
+uci set commands.home_status.command='/usr/sbin/home-router-status'
+uci set commands.home_status.public='0'
+uci commit commands
+exit 0

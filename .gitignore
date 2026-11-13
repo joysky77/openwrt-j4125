@@ -1,0 +1,17 @@
+.venv/
+build/
+artifacts/
+downloads/
+private/
+backups/
+*.key
+*.pem
+*.tgz
+*.img
+*.img.gz
+*.vhdx
+__pycache__/
+.pytest_cache/
+# Historical planning files contain household-specific context; stay local.
+docs/定制方案-*.md
+configs/storage-plan-*.json

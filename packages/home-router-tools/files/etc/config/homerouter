@@ -1,0 +1,6 @@
+config child 'child'
+	option enabled '0'
+	option lan_device 'br-lan'
+	option resume_hour '7'
+	# Activate only after confirming devices and morning recovery time.
+	# list mac 'AA:BB:CC:DD:EE:FF'

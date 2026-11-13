@@ -1,0 +1,40 @@
+#!/bin/sh
+# Explicitly scoped to selected MACs arriving on the configured LAN bridge.
+# Drop in prerouting before conntrack/proxy redirects, covering IPv4/IPv6 and
+# existing flows. Flow offloading must remain disabled for strict enforcement.
+set -eu
+MODE="${1:-apply}"
+case "$MODE" in apply|remove) ;; *) exit 2 ;; esac
+if [ "$MODE" = remove ] || [ "$(uci -q get homerouter.child.enabled || true)" != 1 ]; then
+	nft delete table inet home_child 2>/dev/null || true
+	exit 0
+fi
+LAN="$(uci -q get homerouter.child.lan_device)"
+RESUME="$(uci -q get homerouter.child.resume_hour)"
+case "$LAN" in ''|*[!a-zA-Z0-9_.:-]*) echo 'Invalid LAN device' >&2; exit 2 ;; esac
+case "$RESUME" in [1-9]|1[0-9]|2[0-3]) ;; *) echo 'Confirm resume hour (1-23)' >&2; exit 2 ;; esac
+MACS="$(uci -q get homerouter.child.mac || true)"
+[ -n "$MACS" ] || { echo 'No child devices configured' >&2; exit 2; }
+for mac in $MACS; do
+	printf '%s\n' "$mac" | grep -Eq '^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$' || exit 2
+done
+HOUR="$(date +%H)"
+HOUR="${HOUR#0}"
+[ -n "$HOUR" ] || HOUR=0
+if [ "$HOUR" -ge "$RESUME" ]; then
+	nft delete table inet home_child 2>/dev/null || true
+	exit 0
+fi
+# Updating an existing table is one nft transaction, with no flush of fw4.
+if nft list table inet home_child >/dev/null 2>&1; then
+	{
+		printf 'flush chain inet home_child block\n'
+		for mac in $MACS; do printf 'add rule inet home_child block iifname "%s" ether saddr %s counter drop\n' "$LAN" "$mac"; done
+	} | nft -f -
+else
+	{
+		printf 'table inet home_child {\n chain block {\n type filter hook prerouting priority -310; policy accept;\n'
+		for mac in $MACS; do printf 'iifname "%s" ether saddr %s counter drop\n' "$LAN" "$mac"; done
+		printf '}\n}\n'
+	} | nft -f -
+fi
