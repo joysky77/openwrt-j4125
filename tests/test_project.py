@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('project', ROOT / 'scripts/project.py')
 project = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(project)
+smoke_spec = importlib.util.spec_from_file_location('smoke_boot', ROOT/'scripts/smoke_boot.py')
+smoke = importlib.util.module_from_spec(smoke_spec)
+smoke_spec.loader.exec_module(smoke)
 
 
 def fixture():
@@ -24,6 +27,22 @@ def fixture():
 
 
 class BuildChecks(unittest.TestCase):
+    def test_gzip_fwtool_trailer_is_not_treated_as_another_gzip_member(self):
+        directory = fixture()
+        source = directory/'input.img.gz'
+        payload = b'firmware' * 1024
+        source.write_bytes(gzip.compress(payload) + b'fwtool-metadata')
+        target = directory/'output.img'
+        smoke.decompress_image(source, target, minimum_size=1)
+        self.assertEqual(target.read_bytes(), payload)
+
+    def test_truncated_gzip_is_rejected(self):
+        directory = fixture()
+        source = directory/'input.img.gz'
+        source.write_bytes(gzip.compress(b'firmware')[:-4])
+        with self.assertRaisesRegex(ValueError, 'Truncated'):
+            smoke.decompress_image(source, directory/'output.img', minimum_size=1)
+
     def test_lock_is_immutable(self):
         with contextlib.redirect_stdout(io.StringIO()):
             project.validate()

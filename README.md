@@ -23,6 +23,8 @@
 3. 成功后下载 `firmware-candidate-*`；同时下载 `expansion-kit-*` 和 `diagnostics-*`，并保存在自己的磁盘或 NAS。
 4. 在解压目录执行 `sha256sum -c SHA256SUMS` 检查完整性。固件文件名含本项目版本；原始固件版本和实际包清单保存在 metadata 中。
 
+成功编译后自动触发 `Boot candidate in QEMU`，在没有网卡、没有真实磁盘的一次性虚拟机中检查 Legacy 启动、主要命令和 nft 规则语法。它不代表 UEFI、真实网卡、USB Wi-Fi、NAS 断线恢复或长期稳定性已通过。
+
 Artifacts 有保留期限：固件 30 天、扩展包和日志 14 天；到期前自行保存，不将其当作永久发布。默认不自动发布 GitHub Release、不自动刷机。
 
 Windows 可以使用 `scripts/download-artifacts.ps1 -RunId <运行编号>` 一次下载该次成功构建的全部产物并校验 SHA256；每次生成独立目录，保留旧文件。

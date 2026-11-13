@@ -1,0 +1,38 @@
+name: Boot candidate in QEMU
+on:
+  workflow_run:
+    workflows: [Build candidate firmware]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  boot:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Download this successful candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p artifacts/smoke-input artifacts/logs
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'firmware-candidate-*' --dir artifacts/smoke-input
+          cd artifacts/smoke-input
+          sha256sum -c SHA256SUMS
+      - name: Install isolated emulation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86
+      - name: Boot Legacy candidate and check installed tools
+        run: python3 scripts/smoke_boot.py artifacts/smoke-input artifacts/logs
+      - name: Upload boot evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qemu-boot-${{ github.event.workflow_run.id }}
+          path: artifacts/logs/
+          if-no-files-found: warn
+          retention-days: 30
