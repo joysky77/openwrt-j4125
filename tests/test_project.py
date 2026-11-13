@@ -103,6 +103,12 @@ class BuildChecks(unittest.TestCase):
         for sha in project.lock_data()['actions'].values():
             self.assertIn(sha, workflow)
 
+    def test_seed_is_restored_after_feed_install_before_defconfig(self):
+        script = (ROOT/'scripts/build.sh').read_text(encoding='utf-8')
+        restore = script.index('cp "$PROJECT/configs/x86-64.config" .config')
+        self.assertGreater(restore, script.index('patch-transmission'))
+        self.assertLess(restore, script.index('make defconfig'))
+
     def test_downloads_are_not_enabled_before_mount_configuration(self):
         defaults = (ROOT / 'packages/home-router-tools/files/etc/uci-defaults/90-home-router').read_text(encoding='utf-8')
         self.assertIn("transmission.@transmission[0].enabled='0'", defaults)

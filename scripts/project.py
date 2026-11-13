@@ -76,6 +76,7 @@ def check_config(path):
             raise ValueError('Unexpected all-packages build: ' + prohibited)
     missing = [p for p in required() if f'CONFIG_PACKAGE_{p}=y\n' not in config]
     for symbol in ('CONFIG_TARGET_x86=y', 'CONFIG_TARGET_x86_64=y',
+                   'CONFIG_LUCI_LANG_zh_Hans=y', 'CONFIG_SIGNED_PACKAGES=y',
                    'CONFIG_GRUB_IMAGES=y', 'CONFIG_GRUB_EFI_IMAGES=y',
                    'CONFIG_TARGET_ROOTFS_SQUASHFS=y',
                    'CONFIG_TARGET_KERNEL_PARTSIZE=256', 'CONFIG_TARGET_ROOTFS_PARTSIZE=4096'):

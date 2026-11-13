@@ -5,8 +5,11 @@ BUILD_SOURCE="${BUILD_SOURCE:-$PROJECT/build/openwrt}"
 BUILD_LOGS="${BUILD_LOGS:-$PROJECT/artifacts/logs}"
 FIRMWARE_OUTPUT="${FIRMWARE_OUTPUT:-$PROJECT/artifacts/firmware}"
 mkdir -p "$BUILD_LOGS"
+STAGE="${1:-all}"
+case "$STAGE" in all|prepare|download|compile|collect) ;; *) exit 2 ;; esac
 exec > >(tee -a "$BUILD_LOGS/build.log") 2>&1
 trap 'result=$?; if [[ -f "$BUILD_SOURCE/.config" ]]; then cp "$BUILD_SOURCE/.config" "$BUILD_LOGS/resolved.config"; fi; exit "$result"' EXIT
+if [[ "$STAGE" = all || "$STAGE" = prepare ]]; then
 python3 "$PROJECT/scripts/project.py" prepare --source "$BUILD_SOURCE"
 cd "$BUILD_SOURCE"
 ./scripts/feeds update -a
@@ -33,12 +36,22 @@ packages=[p for p in packages if p not in skip and not p.startswith(('kmod-', 'l
 subprocess.run(['./scripts/feeds','install',*packages],check=True)
 PY
 python3 "$PROJECT/scripts/project.py" patch-transmission --source "$BUILD_SOURCE"
+# Feed indexing can normalize .config before optional packages exist. Restore
+# the requested seed after installing recipes, then resolve it exactly once.
+cp "$PROJECT/configs/x86-64.config" .config
 make defconfig
 python3 "$PROJECT/scripts/project.py" check-config --source .config
 ./scripts/diffconfig.sh > "$BUILD_LOGS/diffconfig"
+fi
+cd "$BUILD_SOURCE"
+if [[ "$STAGE" = all || "$STAGE" = download ]]; then
 make download -j4
+fi
+if [[ "$STAGE" = all || "$STAGE" = compile ]]; then
 # Keep parallelism conservative for Go/toolchain memory and network stability.
 make -j3 V=s
+fi
+if [[ "$STAGE" = all || "$STAGE" = collect ]]; then
 python3 "$PROJECT/scripts/project.py" collect --source "$BUILD_SOURCE" --output "$FIRMWARE_OUTPUT"
 EXPANSION="$(dirname "$FIRMWARE_OUTPUT")/expansion"
 mkdir -p "$EXPANSION"
@@ -58,3 +71,4 @@ with (p/'SHA256SUMS').open('w') as sums:
                 sums.write(hashlib.file_digest(stream,'sha256').hexdigest()+'  '+f.name+'\n')
 PY
 printf 'Candidate built. Hardware, NAS and stability tests are NOT completed.\n'
+fi

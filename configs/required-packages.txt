@@ -14,6 +14,7 @@ transmission-web
 luci-app-transmission
 luci-app-wol
 luci-app-ttyd
+luci-app-commands
 adguardhome
 luci-app-adguardhome
 luci-app-librespeed
