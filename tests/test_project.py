@@ -59,6 +59,12 @@ class BuildChecks(unittest.TestCase):
         self.assertNotIn('mkfs', defaults)
         self.assertNotIn('/dev/sda', defaults)
 
+    def test_status_command_uses_upstream_luci_namespace_and_requires_login(self):
+        defaults = (ROOT / 'packages/home-router-tools/files/etc/uci-defaults/90-home-router').read_text(encoding='utf-8')
+        self.assertIn("luci.home_status='command'", defaults)
+        self.assertIn("luci.home_status.public='0'", defaults)
+        self.assertIn("luci.home_status.param='0'", defaults)
+
 
 @unittest.skipIf(os.name == 'nt', 'POSIX shell runtime tests run on Linux')
 class ChildRules(unittest.TestCase):

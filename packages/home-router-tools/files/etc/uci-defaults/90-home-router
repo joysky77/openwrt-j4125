@@ -21,9 +21,10 @@ uci -q commit transmission
 uci set ucitrack.homerouter='homerouter'
 uci set ucitrack.homerouter.init='home-child-policy'
 uci commit ucitrack
-uci set commands.home_status='command'
-uci set commands.home_status.name='家庭路由：服务与磁盘状态'
-uci set commands.home_status.command='/usr/sbin/home-router-status'
-uci set commands.home_status.public='0'
-uci commit commands
+uci set luci.home_status='command'
+uci set luci.home_status.name='家庭路由：服务与磁盘状态'
+uci set luci.home_status.command='/usr/sbin/home-router-status'
+uci set luci.home_status.param='0'
+uci set luci.home_status.public='0'
+uci commit luci
 exit 0
