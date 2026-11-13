@@ -69,6 +69,9 @@ def prepare(destination):
 
 def check_config(path):
     config = Path(path).read_text(encoding='utf-8')
+    for prohibited in ('CONFIG_ALL_NONSHARED=y', 'CONFIG_ALL_KMODS=y', 'CONFIG_ALL=y'):
+        if prohibited + '\n' in config:
+            raise ValueError('Unexpected all-packages build: ' + prohibited)
     missing = [p for p in required() if f'CONFIG_PACKAGE_{p}=y\n' not in config]
     for symbol in ('CONFIG_TARGET_x86=y', 'CONFIG_TARGET_x86_64=y',
                    'CONFIG_GRUB_IMAGES=y', 'CONFIG_GRUB_EFI_IMAGES=y',
