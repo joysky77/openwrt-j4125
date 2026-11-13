@@ -33,20 +33,16 @@ def main():
     images = list(source.glob('*squashfs-combined.img.gz'))
     if len(images) != 1:
         raise ValueError('Expected one Legacy candidate image')
-    raw = evidence / 'boot-test-disk.img'
+    scratch = evidence.parent / 'smoke-work'
+    scratch.mkdir(exist_ok=True)
+    raw = scratch / 'boot-test-disk.img'
     decompress_image(images[0], raw)
     log = evidence / 'serial.log'
     command = ['qemu-system-x86_64', '-machine', 'pc', '-accel', 'tcg',
                '-cpu', 'qemu64', '-m', '1024', '-smp', '2', '-nographic',
                '-monitor', 'none', '-no-reboot', '-snapshot', '-nic', 'none',
                '-drive', f'file={raw},format=raw,if=ide']
-    # Do not upload the 4GiB raw scratch disk in the evidence artifact. It is
-    # created under build/ instead, preserving logs even if QEMU fails.
-    scratch = evidence.parent / 'smoke-work'
-    scratch.mkdir(exist_ok=True)
-    scratch_disk = scratch / raw.name
-    raw.rename(scratch_disk)
-    command[-1] = f'file={scratch_disk},format=raw,if=ide'
+    # The raw scratch disk stays outside the logs artifact even on failure.
     check = '''
 errors=0
 echo HOME_SMOKE_BEGIN
