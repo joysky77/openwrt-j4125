@@ -10,10 +10,12 @@ df -h -l
 printf '\nConfigured mounts\n'
 awk '$3 ~ /^(nfs|nfs4|cifs|fuse.rclone)$/ {print $1, $2, $3}' /proc/mounts
 printf '\nEnabled services (not a business health assertion)\n'
-for name in dockerd zerotier adguardhome transmission passwall2 p910nd miniupnpd home-child-policy; do
+for name in dockerd zerotier adguardhome transmission passwall2 p910nd miniupnpd home-child-policy home-nas-watch; do
 	if [ -x "/etc/init.d/$name" ]; then
 		if "/etc/init.d/$name" enabled; then printf '%s: enabled\n' "$name"; else printf '%s: disabled/unconfigured\n' "$name"; fi
 	fi
 done
+printf '\nNAS download guard\n'
+cat /tmp/home-nas-state 2>/dev/null || printf 'Not configured\n'
 printf '\nChild rule status\n'
 nft list table inet home_child 2>/dev/null || true

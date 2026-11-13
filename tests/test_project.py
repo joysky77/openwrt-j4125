@@ -1,10 +1,12 @@
 import contextlib
+import gzip
 import importlib.util
 import io
 import json
 import os
 from pathlib import Path
 import subprocess
+import struct
 import unittest
 import uuid
 
@@ -29,6 +31,55 @@ class BuildChecks(unittest.TestCase):
     def test_missing_required_package_is_a_failure(self):
         with self.assertRaisesRegex(ValueError, 'Required selections absent'):
             project.check_config(ROOT / 'README.md')
+
+    def test_all_modules_build_is_rejected(self):
+        file = fixture() / 'resolved.config'
+        file.write_text('CONFIG_ALL_KMODS=y\n')
+        with self.assertRaisesRegex(ValueError, 'all-packages'):
+            project.check_config(file)
+
+    def test_mbr_partition_size_is_verified(self):
+        header = bytearray(65536)
+        header[510:512] = b'\x55\xaa'
+        struct.pack_into('<I', header, 446+12, 256*2048)
+        struct.pack_into('<I', header, 462+12, 4096*2048)
+        file = fixture() / 'image.img.gz'
+        with gzip.open(file, 'wb') as stream:
+            stream.write(header)
+        self.assertEqual(project.image_partitions(file), [256*1024**2, 4096*1024**2])
+
+    def test_wrong_partition_size_is_rejected(self):
+        file = fixture() / 'bad.img.gz'
+        with gzip.open(file, 'wb') as stream:
+            stream.write(bytes(65536))
+        with self.assertRaisesRegex(ValueError, 'signature'):
+            project.image_partitions(file)
+
+    def test_gpt_partition_size_is_verified(self):
+        header = bytearray(65536)
+        header[510:512] = b'\x55\xaa'
+        header[512:520] = b'EFI PART'
+        struct.pack_into('<Q', header, 512+72, 2)
+        struct.pack_into('<I', header, 512+84, 128)
+        struct.pack_into('<QQ', header, 1024+32, 2048, 2048+256*2048-1)
+        struct.pack_into('<QQ', header, 1152+32, 526336, 526336+4096*2048-1)
+        file = fixture() / 'efi.img.gz'
+        with gzip.open(file, 'wb') as stream:
+            stream.write(header)
+        self.assertEqual(project.image_partitions(file), [256*1024**2, 4096*1024**2])
+
+    def test_transmission_guard_is_before_any_directory_creation(self):
+        directory = fixture()
+        file = directory / 'feeds/packages/net/transmission/files/transmission.init'
+        file.parent.mkdir(parents=True)
+        file.write_text('transmission() {\n\tlocal cfg="$1"\n\tmkdir -p "$download_dir"\n}\n')
+        project.patch_transmission(directory)
+        content = file.read_text(encoding='utf-8')
+        self.assertLess(content.index('home-storage-check'), content.index('mkdir'))
+        with self.assertRaisesRegex(ValueError, 'changed'):
+            # An unexpected upstream template must not be silently patched.
+            file.write_text('other_function() {}\n')
+            project.patch_transmission(directory)
 
     def test_collect_rejects_no_firmware(self):
         directory = fixture()
@@ -114,6 +165,61 @@ class ChildRules(unittest.TestCase):
 
     def test_missing_devices_rejected(self):
         self.assertNotEqual(self.execute(mac='').returncode, 0)
+
+
+@unittest.skipIf(os.name == 'nt', 'POSIX storage checks run on Linux')
+class StorageGuard(unittest.TestCase):
+    def execute(self, *, mounted=True, marker='unit', free_kib=50000000):
+        directory = fixture()
+        local, nas, tools = directory/'data', directory/'nas', directory/'tools'
+        for path in (local/'appdata/transmission', nas/'incomplete', nas/'complete', tools):
+            path.mkdir(parents=True)
+        (nas/'.openwrt-download-target').write_text(marker)
+        mounts = directory/'mounts'
+        mounts.write_text(f'/dev/fake {local} ext4 rw 0 0\n' + (f'192.0.2.1:/Downloads {nas} nfs4 rw 0 0\n' if mounted else ''))
+        values = {'homerouter.nas.enabled':'1', 'homerouter.nas.source':'192.0.2.1:/Downloads',
+                  'homerouter.nas.marker':'unit', 'homerouter.nas.data_uuid':'1234-abcd',
+                  'homerouter.nas.min_free_gib':'10', 'transmission.@transmission[0].user':'transmission',
+                  'transmission.@transmission[0].download_dir':str(nas/'complete'),
+                  'transmission.@transmission[0].incomplete_dir':str(nas/'incomplete'),
+                  'transmission.@transmission[0].config_dir':str(local/'appdata/transmission')}
+        commands = {
+            'uci': '#!/usr/bin/env python3\nimport json,os,sys\nprint(json.loads(os.environ["GUARD_UCI"])[sys.argv[-1]])\n',
+            'blkid': '#!/bin/sh\nprintf "1234-abcd\\n"\n',
+            'df': '#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\n"\nprintf "test 999999999 1 %s 1%% test\\n" "$GUARD_FREE"\n',
+            'su': '#!/bin/sh\n[ "$1" = -s ] && [ "$2" = /bin/sh ] && [ "$3" = -c ] && [ "$5" = transmission ] || exit 2\nexec sh -c "$4"\n',
+        }
+        for name, content in commands.items():
+            path = tools/name
+            path.write_text(content)
+            path.chmod(0o755)
+        content = (ROOT/'packages/home-router-tools/files/usr/sbin/home-storage-check').read_text(encoding='utf-8')
+        content = content.replace('/mnt/nas-downloads', str(nas)).replace('/srv/data', str(local)).replace('/proc/mounts', str(mounts)).replace('/tmp/home-storage-check.lock', str(directory/'guard.lock'))
+        script = directory/'check.sh'
+        script.write_text(content)
+        script.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools)+os.pathsep+os.environ['PATH'], GUARD_UCI=json.dumps(values), GUARD_FREE=str(free_kib))
+        result = subprocess.run([str(script)], env=env, text=True, capture_output=True, timeout=15)
+        return result, nas
+
+    def test_valid_mount_and_permissions_allow_start(self):
+        result, nas = self.execute()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((nas/'.openwrt-write-probe').exists())
+
+    def test_unmounted_directory_never_passes_or_writes_probe(self):
+        result, nas = self.execute(mounted=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((nas/'.openwrt-write-probe').exists())
+
+    def test_wrong_share_marker_fails_closed(self):
+        result, nas = self.execute(marker='different-nas')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((nas/'.openwrt-write-probe').exists())
+
+    def test_insufficient_space_rejects_start(self):
+        result, _ = self.execute(free_kib=100)
+        self.assertNotEqual(result.returncode, 0)
 
 
 if __name__ == '__main__':

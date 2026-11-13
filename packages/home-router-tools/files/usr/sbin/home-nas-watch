@@ -1,0 +1,19 @@
+#!/bin/sh
+# Supervisor is separate from network startup. Do not mount/unmount NFS here.
+PREVIOUS=unknown
+while :; do
+	if /usr/sbin/home-storage-check; then STATE=ready; else STATE=unavailable; fi
+	if [ "$STATE" != "$PREVIOUS" ]; then
+		logger -t home-nas-watch "Download storage $STATE"
+		printf '%s\n' "$STATE" > /tmp/home-nas-state
+		PREVIOUS="$STATE"
+	fi
+	if [ "$STATE" = ready ]; then
+		if [ "$(uci -q get transmission.@transmission[0].enabled)" = 1 ] && ! pidof transmission-daemon >/dev/null; then
+			/etc/init.d/transmission start || true
+		fi
+	elif /etc/init.d/transmission running; then
+		/etc/init.d/transmission stop || true
+	fi
+	sleep 30
+done

@@ -40,7 +40,7 @@ Windows 可以使用 `scripts/download-artifacts.ps1 -RunId <运行编号>` 一�
 - 配置 NFS/SMB 挂载和读写权限前不启用下载，下载配置已指向 `/mnt/nas-downloads/{incomplete,complete}`。
 - 默认不启用 Docker、下载器、代理、AdGuard Home、ZeroTier、UPnP、打印服务及网页终端；这是候选固件的待配置状态。先配置本地存储、访问范围和各服务，再手动启用。
 - AdGuard Home 启用前须明确 DHCP、dnsmasq、代理和 DNS 上游关系，验证端口冲突与故障恢复；首次启动不改动基础 DNS 为未配置的过滤服务。
-- 群晖挂载守护、磁盘初始化、旧配置迁移、WebDAV 凭据和 DNS 最终拓扑仍需基于真实环境实施；本工程不宣称这些已经实机完成。
+- 群晖下载启动检查与监督逻辑已加入：核对挂载源、共享标识、本地 UUID、写权限和空间；需按实际设备配置并进行断线恢复测试。磁盘初始化、旧配置迁移、WebDAV 凭据和 DNS 最终拓扑仍需基于真实环境实施。
 
 参阅 [安装与验收](docs/INSTALL.md) 和 [构建维护](docs/BUILD.md)。
 

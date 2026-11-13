@@ -20,6 +20,9 @@ uci -q set transmission.@transmission[0].config_dir='/srv/data/appdata/transmiss
 uci -q commit transmission
 uci set ucitrack.homerouter='homerouter'
 uci set ucitrack.homerouter.init='home-child-policy'
+uci add_list ucitrack.homerouter.affects='home_nas_watch'
+uci set ucitrack.home_nas_watch='home_nas_watch'
+uci set ucitrack.home_nas_watch.init='home-nas-watch'
 uci commit ucitrack
 uci set luci.home_status='command'
 uci set luci.home_status.name='家庭路由：服务与磁盘状态'

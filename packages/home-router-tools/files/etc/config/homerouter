@@ -4,3 +4,10 @@ config child 'child'
 	option resume_hour '7'
 	# Activate only after confirming devices and morning recovery time.
 	# list mac 'AA:BB:CC:DD:EE:FF'
+
+config nas 'nas'
+	option enabled '0'
+	option source ''
+	option marker ''
+	option data_uuid ''
+	option min_free_gib '10'

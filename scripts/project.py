@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Validate and prepare a pinned OpenWrt build; standard library only."""
 import argparse
+import gzip
 import hashlib
 import json
 import re
 import shutil
 import subprocess
+import struct
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,6 +86,37 @@ def check_config(path):
     print(f'All {len(required())} required packages selected in resolved configuration.')
 
 
+def image_partitions(path):
+    with gzip.open(path, 'rb') as image:
+        header = image.read(65536)
+    if header[510:512] != b'\x55\xaa':
+        raise ValueError('Invalid image MBR signature')
+    if header[512:520] == b'EFI PART':
+        entries_lba = struct.unpack_from('<Q', header, 512 + 72)[0]
+        entry_size = struct.unpack_from('<I', header, 512 + 84)[0]
+        if entry_size < 128 or entries_lba * 512 + entry_size * 2 > len(header):
+            raise ValueError('Unsupported GPT entries')
+        sizes = []
+        for i in range(2):
+            start, end = struct.unpack_from('<QQ', header, entries_lba * 512 + entry_size * i + 32)
+            sizes.append((end - start + 1) * 512)
+    else:
+        sizes = [struct.unpack_from('<I', header, 446 + 16 * i + 12)[0] * 512 for i in range(2)]
+    if sizes != [256 * 1024**2, 4096 * 1024**2]:
+        raise ValueError(f'Unexpected boot/root partition sizes: {sizes}')
+    return sizes
+
+
+def patch_transmission(source):
+    script = Path(source) / 'feeds/packages/net/transmission/files/transmission.init'
+    text = script.read_text(encoding='utf-8')
+    anchor = 'transmission() {\n\tlocal cfg="$1"\n'
+    if text.count(anchor) != 1:
+        raise ValueError('Upstream Transmission init changed; review storage guard placement')
+    guard = '\t/usr/sbin/home-storage-check || { logger -t transmission "Storage guard rejected start"; return 1; }\n'
+    script.write_text(text.replace(anchor, anchor + guard), encoding='utf-8')
+
+
 def collect(source, output):
     source, output = Path(source).resolve(), Path(output).resolve()
     target = source / 'bin/targets/x86/64'
@@ -98,6 +131,7 @@ def collect(source, output):
     images = list(target.glob('*squashfs-combined*.img.gz'))
     if not any('combined-efi' in p.name for p in images) or not any('combined.img' in p.name for p in images):
         raise ValueError('Both UEFI and Legacy combined disk images are required')
+    partition_report = {p.name: image_partitions(p) for p in images}
     output.mkdir(parents=True, exist_ok=True)
     version = lock_data()['firmware_version']
     for file in images:
@@ -109,6 +143,7 @@ def collect(source, output):
             shutil.copy2(file, metadata / file.name)
     shutil.copy2(source / '.config', metadata / 'resolved.config')
     shutil.copy2(ROOT / 'configs/build-lock.json', metadata / 'build-lock.json')
+    (metadata / 'image-partitions.json').write_text(json.dumps(partition_report, indent=2) + '\n')
     shutil.copy2(ROOT / 'README.md', output / 'README.md')
     shutil.copytree(ROOT / 'docs', output / 'docs', dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns('定制方案-*'))
@@ -130,7 +165,7 @@ def collect(source, output):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('command', choices=('validate', 'prepare', 'check-config', 'collect'))
+    parser.add_argument('command', choices=('validate', 'prepare', 'check-config', 'collect', 'patch-transmission'))
     parser.add_argument('--source')
     parser.add_argument('--output')
     args = parser.parse_args()
@@ -140,6 +175,8 @@ def main():
         prepare(args.source)
     elif args.command == 'check-config':
         check_config(args.source)
+    elif args.command == 'patch-transmission':
+        patch_transmission(args.source)
     else:
         collect(args.source, args.output)
 

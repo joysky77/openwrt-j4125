@@ -18,11 +18,21 @@ for name, source in lock['feeds'].items():
     if actual != source['commit']:
         raise SystemExit('Feed commit mismatch: '+name)
 PY
-./scripts/feeds install -a -p packages
-./scripts/feeds install -a -p luci
-./scripts/feeds install -a -p routing
-./scripts/feeds install -f -a -p passwall_packages
-./scripts/feeds install -a -p passwall2
+# Index all locked feeds, but install only selected recipes plus their
+# dependencies. Installing every unrelated LuCI app can introduce upstream
+# Kconfig cycles even when those apps are not selected for the firmware.
+./scripts/feeds install -p passwall_packages chinadns-ng geoview tcping
+./scripts/feeds install -p passwall2 luci-app-passwall2
+python3 - "$PROJECT/configs/x86-64.config" <<'PY'
+import re, subprocess, sys
+text=open(sys.argv[1]).read()
+packages=re.findall(r'^CONFIG_PACKAGE_([^=]+)=y$', text, re.M)
+skip={'home-router-tools','luci-app-passwall2'}
+# Kconfig suboptions are not standalone package recipes.
+packages=[p for p in packages if p not in skip and not p.startswith(('kmod-', 'luci-app-passwall2_', 'dnsmasq_'))]
+subprocess.run(['./scripts/feeds','install',*packages],check=True)
+PY
+python3 "$PROJECT/scripts/project.py" patch-transmission --source "$BUILD_SOURCE"
 make defconfig
 python3 "$PROJECT/scripts/project.py" check-config --source .config
 ./scripts/diffconfig.sh > "$BUILD_LOGS/diffconfig"

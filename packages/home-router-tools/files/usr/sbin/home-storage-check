@@ -1,0 +1,37 @@
+#!/bin/sh
+# Fixed download paths only. The local lock is inherited by a blocked probe,
+# preventing repeated timeout attempts from accumulating NFS I/O workers.
+set -eu
+if [ "${1:-}" != --probe ]; then
+	exec 9>/tmp/home-storage-check.lock
+	flock -n 9 || exit 75
+	exec timeout -k 2 8 "$0" --probe
+fi
+[ "$(uci -q get homerouter.nas.enabled || true)" = 1 ] || exit 1
+SOURCE="$(uci -q get homerouter.nas.source)"
+MARKER="$(uci -q get homerouter.nas.marker)"
+UUID="$(uci -q get homerouter.nas.data_uuid)"
+MIN="$(uci -q get homerouter.nas.min_free_gib || echo 10)"
+case "$SOURCE" in ''|*[[:space:]]*) exit 2 ;; esac
+case "$MARKER" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
+case "$UUID" in ''|*[!a-zA-Z0-9-]*) exit 2 ;; esac
+case "$MIN" in ''|*[!0-9]*) exit 2 ;; esac
+[ "$MIN" -ge 1 ] && [ "$MIN" -le 100000 ] || exit 2
+LOCAL="$(awk '$2=="/srv/data" && $3=="ext4" {print $1}' /proc/mounts)"
+[ -n "$LOCAL" ] || exit 1
+[ "$(blkid -s UUID -o value "$LOCAL")" = "$UUID" ] || exit 1
+ACTUAL="$(awk '$2=="/mnt/nas-downloads" && ($3=="nfs" || $3=="nfs4" || $3=="cifs") {print $1}' /proc/mounts)"
+[ "$ACTUAL" = "$SOURCE" ] || exit 1
+[ "$(head -c 128 /mnt/nas-downloads/.openwrt-download-target)" = "$MARKER" ] || exit 1
+[ "$(uci -q get transmission.@transmission[0].user)" = transmission ] || exit 1
+[ "$(uci -q get transmission.@transmission[0].download_dir)" = /mnt/nas-downloads/complete ] || exit 1
+[ "$(uci -q get transmission.@transmission[0].incomplete_dir)" = /mnt/nas-downloads/incomplete ] || exit 1
+[ "$(uci -q get transmission.@transmission[0].config_dir)" = /srv/data/appdata/transmission ] || exit 1
+# Check actual write permissions as the daemon user. This fixed, small health
+# file is overwritten, never deletes or replaces user download data.
+su -s /bin/sh -c 'test -w /mnt/nas-downloads/complete && test -w /mnt/nas-downloads/incomplete && test -w /srv/data/appdata/transmission && printf "healthy\n" > /mnt/nas-downloads/.openwrt-write-probe' transmission
+FREE="$(df -Pk /mnt/nas-downloads | awk 'NR==2 {print $4}')"
+LOCAL_FREE="$(df -Pk /srv/data | awk 'NR==2 {print $4}')"
+case "$FREE:$LOCAL_FREE" in *[!0-9:]*|:|*:) exit 1 ;; esac
+[ "$FREE" -ge "$((MIN * 1024 * 1024))" ] || exit 1
+[ "$LOCAL_FREE" -ge 20971520 ] || exit 1
