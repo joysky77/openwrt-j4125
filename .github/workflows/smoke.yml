@@ -36,9 +36,11 @@ jobs:
       - name: Install isolated emulation tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf
       - name: Boot Legacy candidate and check installed tools
-        run: python3 scripts/smoke_boot.py artifacts/smoke-input artifacts/logs
+        run: python3 scripts/smoke_boot.py artifacts/smoke-input artifacts/logs/legacy legacy
+      - name: Boot UEFI candidate and check installed tools
+        run: python3 scripts/smoke_boot.py artifacts/smoke-input artifacts/logs/uefi uefi
       - name: Upload boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

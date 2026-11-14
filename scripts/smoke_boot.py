@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -29,19 +30,32 @@ def decompress_image(source, target, minimum_size=(256 + 4096) * 1024**2):
 
 def main():
     source, evidence = map(lambda v: Path(v).resolve(), sys.argv[1:3])
+    mode = sys.argv[3] if len(sys.argv) > 3 else 'legacy'
+    if mode not in ('legacy', 'uefi'):
+        raise ValueError('Unsupported boot mode')
     evidence.mkdir(parents=True, exist_ok=True)
-    images = list(source.glob('*squashfs-combined.img.gz'))
+    pattern = '*squashfs-combined-efi.img.gz' if mode == 'uefi' else '*squashfs-combined.img.gz'
+    images = list(source.glob(pattern))
     if len(images) != 1:
-        raise ValueError('Expected one Legacy candidate image')
+        raise ValueError(f'Expected one {mode} candidate image')
     scratch = evidence.parent / 'smoke-work'
     scratch.mkdir(exist_ok=True)
-    raw = scratch / 'boot-test-disk.img'
+    raw = scratch / f'boot-test-disk-{mode}.img'
     decompress_image(images[0], raw)
     log = evidence / 'serial.log'
     command = ['qemu-system-x86_64', '-machine', 'pc', '-accel', 'tcg',
                '-cpu', 'qemu64', '-m', '1024', '-smp', '2', '-nographic',
                '-monitor', 'none', '-no-reboot', '-snapshot', '-nic', 'none',
                '-drive', f'file={raw},format=raw,if=ide']
+    if mode == 'uefi':
+        code = Path('/usr/share/OVMF/OVMF_CODE_4M.fd')
+        template = Path('/usr/share/OVMF/OVMF_VARS_4M.fd')
+        if not code.is_file() or not template.is_file():
+            raise FileNotFoundError('Standard non-secure-boot OVMF firmware missing')
+        variables = scratch/'OVMF_VARS_4M.fd'
+        shutil.copyfile(template, variables)
+        command.extend(['-drive', f'if=pflash,format=raw,readonly=on,file={code}',
+                        '-drive', f'if=pflash,format=raw,file={variables}'])
     # The raw scratch disk stays outside the logs artifact even on failure.
     check = '''
 errors=0
@@ -108,11 +122,11 @@ poweroff
                     process.kill()
                     process.wait(timeout=10)
     (evidence / 'boot-result.json').write_text(json.dumps({
-        'legacy_qemu_boot_passed': True, 'tool_checks_passed': True,
-        'nft_rule_syntax_checked_in_guest': True, 'uefi_boot_tested': False,
+        'boot_mode': mode, 'qemu_boot_passed': True, 'tool_checks_passed': True,
+        'nft_rule_syntax_checked_in_guest': True, 'night_and_morning_policy_passed': True,
         'physical_hardware_tested': False, 'nas_disconnect_tested': False,
         'stability_soak_passed': False}, indent=2) + '\n', encoding='utf-8')
-    print('QEMU Legacy boot and basic tool checks passed; physical validation remains pending.')
+    print(f'QEMU {mode} boot and policy checks passed; physical validation remains pending.')
 
 
 if __name__ == '__main__':
