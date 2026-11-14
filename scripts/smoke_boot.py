@@ -38,7 +38,7 @@ def main():
     images = list(source.glob(pattern))
     if len(images) != 1:
         raise ValueError(f'Expected one {mode} candidate image')
-    scratch = evidence.parent / 'smoke-work'
+    scratch = source.parent / 'smoke-work'
     scratch.mkdir(exist_ok=True)
     raw = scratch / f'boot-test-disk-{mode}.img'
     decompress_image(images[0], raw)
