@@ -1,5 +1,11 @@
 name: Boot candidate in QEMU
 on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful firmware build run ID
+        required: true
+        type: string
   workflow_run:
     workflows: [Build candidate firmware]
     types: [completed]
@@ -8,7 +14,7 @@ permissions:
   actions: read
 jobs:
   boot:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -16,10 +22,15 @@ jobs:
       - name: Download this successful candidate
         env:
           GH_TOKEN: ${{ github.token }}
-          BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+          BUILD_RUN_ID: ${{ github.event.workflow_run.id || inputs.build_run_id }}
         run: |
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
           mkdir -p artifacts/smoke-input artifacts/logs
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'firmware-candidate-*' --dir artifacts/smoke-input
+          valid=$(gh run view "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --json name,conclusion --jq '.name == "Build candidate firmware" and .conclusion == "success"')
+          [[ "$valid" = true ]]
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts" --jq '.artifacts[] | select(.expired == false and (.name | startswith("firmware-candidate-"))) | .name')
+          [[ -n "$artifact" && "$artifact" != *$'\n'* ]]
+          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$artifact" --dir artifacts/smoke-input
           cd artifacts/smoke-input
           sha256sum -c SHA256SUMS
       - name: Install isolated emulation tools
@@ -32,7 +43,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: qemu-boot-${{ github.event.workflow_run.id }}
+          name: qemu-boot-${{ github.event.workflow_run.id || inputs.build_run_id }}-${{ github.run_attempt }}
           path: artifacts/logs/
           if-no-files-found: warn
           retention-days: 30

@@ -27,6 +27,12 @@ def fixture():
 
 
 class BuildChecks(unittest.TestCase):
+    def test_smoke_download_uses_one_exact_artifact_without_nested_pattern_directory(self):
+        workflow = (ROOT/'.github/workflows/smoke.yml').read_text(encoding='utf-8')
+        self.assertIn('--name "$artifact" --dir artifacts/smoke-input', workflow)
+        self.assertNotIn('--pattern', workflow)
+        self.assertIn('workflow_dispatch:', workflow)
+
     def test_gzip_fwtool_trailer_is_not_treated_as_another_gzip_member(self):
         directory = fixture()
         source = directory/'input.img.gz'
