@@ -46,6 +46,8 @@ Windows 可以使用 `scripts/download-artifacts.ps1 -RunId <运行编号>` 一�
 
 参阅 [安装与验收](docs/INSTALL.md) 和 [构建维护](docs/BUILD.md)。
 
+2026-11-14：首个候选版本已成功构建，并通过 [Legacy/UEFI 双模式 QEMU 验证](https://github.com/joysky77/openwrt-j4125/actions/runs/43548717718)。小主机当前未运行 OpenWrt，参阅[实机安装准备](docs/INSTALL-PREPARATION.md)。候选镜像保存在本地版本目录，真实设备和长期稳定性仍待验收。
+
 ## 扩展与稳定性
 
 普通插件通过当前发行版软件管理器安装。驱动必须匹配内核 ABI；自编译内核不能保证兼容任意官方在线 kmod。匹配包、SDK 和 Image Builder 随成功构建归档，需要新的驱动时可用同一锁重建；不是保证任意未来插件无需重编。

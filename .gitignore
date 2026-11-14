@@ -1,6 +1,7 @@
 .venv/
 build/
 artifacts/
+releases/
 downloads/
 private/
 backups/

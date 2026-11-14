@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory = $true)][long]$RunId,
     [string]$Repository = 'joysky77/openwrt-j4125',
     [string]$OutputRoot = (Join-Path $PSScriptRoot '..\artifacts'),
-    [string]$TemporaryRoot = 'D:\AiTemp\openwrt-cloud-tools\download-temp'
+    [string]$TemporaryRoot = 'D:\AiTemp\openwrt-cloud-tools\download-temp',
+    [switch]$VerifyOnly,
+    [string]$ExistingDirectory
 )
 $ErrorActionPreference = 'Stop'
 if ($RunId -le 0 -or $Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
@@ -14,6 +16,12 @@ $run = $runJson | ConvertFrom-Json
 if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') {
     throw "Build is not successful yet: $($run.status)/$($run.conclusion)"
 }
+if ($VerifyOnly) {
+    if (-not $ExistingDirectory -or -not (Test-Path -LiteralPath $ExistingDirectory -PathType Container)) {
+        throw 'VerifyOnly requires an existing artifact directory.'
+    }
+    $destination = [IO.Path]::GetFullPath($ExistingDirectory)
+} else {
 $destination = [IO.Path]::GetFullPath((Join-Path $OutputRoot ("run-{0}-{1}" -f $RunId, (Get-Date -Format 'yyyyMMdd-HHmmss'))))
 if (Test-Path -LiteralPath $destination) { throw 'Destination already exists; preserve old artifacts.' }
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
@@ -29,7 +37,10 @@ try {
     $env:TEMP = $previousTemp
     $env:TMP = $previousTmp
 }
-$sums = @(Get-ChildItem -LiteralPath $destination -Recurse -File -Filter SHA256SUMS)
+}
+# Windows globbing is case-insensitive. Upstream metadata/sha256sums describes
+# original filenames, whereas our uppercase SHA256SUMS covers renamed files.
+$sums = @(Get-ChildItem -LiteralPath $destination -Recurse -File -Filter SHA256SUMS | Where-Object { $_.Name -ceq 'SHA256SUMS' })
 if ($sums.Count -lt 2) { throw 'Expected checksums for firmware and expansion kit.' }
 foreach ($sum in $sums) {
     $basePath = [IO.Path]::GetFullPath($sum.DirectoryName) + [IO.Path]::DirectorySeparatorChar
