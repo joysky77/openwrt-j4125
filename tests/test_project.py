@@ -33,6 +33,13 @@ class BuildChecks(unittest.TestCase):
         self.assertNotIn('--pattern', workflow)
         self.assertIn('workflow_dispatch:', workflow)
 
+    def test_guest_checks_wait_for_initialization_and_execute_real_policy(self):
+        script = (ROOT/'scripts/smoke_boot.py').read_text(encoding='utf-8')
+        self.assertIn('uci -q get luci.home_status.command', script)
+        self.assertIn("date -s '2026-01-01 00:01:00'", script)
+        self.assertIn("date -s '2026-01-01 07:01:00'", script)
+        self.assertIn('nft list table inet home_child', script)
+
     def test_gzip_fwtool_trailer_is_not_treated_as_another_gzip_member(self):
         directory = fixture()
         source = directory/'input.img.gz'

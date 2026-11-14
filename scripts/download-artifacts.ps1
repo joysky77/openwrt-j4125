@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)][long]$RunId,
     [string]$Repository = 'joysky77/openwrt-j4125',
-    [string]$OutputRoot = (Join-Path $PSScriptRoot '..\artifacts')
+    [string]$OutputRoot = (Join-Path $PSScriptRoot '..\artifacts'),
+    [string]$TemporaryRoot = 'D:\AiTemp\openwrt-cloud-tools\download-temp'
 )
 $ErrorActionPreference = 'Stop'
 if ($RunId -le 0 -or $Repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
@@ -16,8 +17,18 @@ if ($run.status -ne 'completed' -or $run.conclusion -ne 'success') {
 $destination = [IO.Path]::GetFullPath((Join-Path $OutputRoot ("run-{0}-{1}" -f $RunId, (Get-Date -Format 'yyyyMMdd-HHmmss'))))
 if (Test-Path -LiteralPath $destination) { throw 'Destination already exists; preserve old artifacts.' }
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
-gh run download $RunId --repo $Repository --dir $destination
-if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed.' }
+New-Item -ItemType Directory -Path $TemporaryRoot -Force | Out-Null
+$previousTemp = $env:TEMP
+$previousTmp = $env:TMP
+try {
+    $env:TEMP = [IO.Path]::GetFullPath($TemporaryRoot)
+    $env:TMP = $env:TEMP
+    gh run download $RunId --repo $Repository --dir $destination
+    if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed.' }
+} finally {
+    $env:TEMP = $previousTemp
+    $env:TMP = $previousTmp
+}
 $sums = @(Get-ChildItem -LiteralPath $destination -Recurse -File -Filter SHA256SUMS)
 if ($sums.Count -lt 2) { throw 'Expected checksums for firmware and expansion kit.' }
 foreach ($sum in $sums) {

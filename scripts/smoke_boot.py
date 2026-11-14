@@ -46,11 +46,27 @@ def main():
     check = '''
 errors=0
 echo HOME_SMOKE_BEGIN
+tries=0
+while [ "$(cat /proc/sys/kernel/hostname)" = '(none)' ] && [ "$tries" -lt 60 ]; do
+  sleep 2
+  tries=$((tries+1))
+done
+test "$(cat /proc/sys/kernel/hostname)" != '(none)' || errors=$((errors+1))
+test "$(uci -q get luci.home_status.command)" = /usr/sbin/home-router-status || errors=$((errors+1))
 for binary in apk uci nft docker dockerd zerotier-cli rclone transmission-daemon xray sing-box librespeed-cli home-storage-check home-child-policy; do
   command -v "$binary" || errors=$((errors+1))
 done
 ubus call system board || errors=$((errors+1))
-nft -c 'table inet home_smoke { chain block { type filter hook prerouting priority -310; policy accept; iifname "br-lan" ether saddr 02:00:00:00:00:01 counter drop; } }' || errors=$((errors+1))
+uci set homerouter.child.enabled='1'
+uci set homerouter.child.lan_device='br-lan'
+uci set homerouter.child.resume_hour='7'
+uci set homerouter.child.mac='02:00:00:00:00:01'
+date -s '2026-01-01 00:01:00' || errors=$((errors+1))
+home-child-policy apply || errors=$((errors+1))
+nft list table inet home_child || errors=$((errors+1))
+date -s '2026-01-01 07:01:00' || errors=$((errors+1))
+home-child-policy apply || errors=$((errors+1))
+if nft list table inet home_child 2>/dev/null; then errors=$((errors+1)); fi
 echo HOME_SMOKE_RESULT:$errors
 sync
 poweroff
