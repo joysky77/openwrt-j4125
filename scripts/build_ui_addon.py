@@ -68,6 +68,13 @@ def build(sdk, output, staging_root=None):
         subprocess.run([str(tool), 'verify', '--allow-untrusted', str(package)], check=True)
         sums.append(digest(package) + '  ' + package.name)
     (output / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
+    shutil.copyfile(ROOT / 'scripts/install_ui_update.sh', output / 'install_ui_update.sh')
+    installer = (ROOT / 'scripts/Install-Home-UI-0.2.0.ps1').read_text()
+    installer = installer.replace('__BUNDLE_SHA256__', digest(output / 'SHA256SUMS'))
+    (output / 'Install-Home-UI-0.2.0.ps1').write_text(installer)
+    guide = ROOT / 'docs/UI-UPDATE-0.2.0.md'
+    if guide.exists():
+        shutil.copyfile(guide, output / '安装说明.md')
     shutil.copyfile(ROOT / 'configs/ui-addon-lock.json', output / 'ui-addon-lock.json')
     print('UI update bundle created:', output)
 

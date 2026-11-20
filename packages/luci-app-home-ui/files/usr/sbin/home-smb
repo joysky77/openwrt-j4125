@@ -5,7 +5,11 @@
 set -eu
 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
-state() { printf '%s\n' "$1" > /tmp/home-smb-state; }
+umask 077
+run=/var/run/home-smb
+mkdir -p "$run"
+chmod 0700 "$run"
+state() { printf '%s\n' "$1" > "$run/state"; }
 config() {
 	. /lib/functions.sh
 	config_load homesmb
@@ -39,22 +43,29 @@ case "${1:-status}" in
 	worker)
 		while :; do "$0" mount >/dev/null 2>&1 || true; sleep 30; done ;;
 	mount|unmount)
-		exec 9>/tmp/home-smb.lock
+		exec 9>"$run/lock"
 		flock -n 9 || exit 75
-		exec timeout -k 2 15 "$0" "_${1}" ;;
+		if timeout -k 2 15 "$0" "_${1}"; then exit 0; else
+			code=$?
+			case "$code" in 124|137) state '操作超时；请检查 NAS 与网络，后台不会累积并发挂载任务。' ;; esac
+			exit "$code"
+		fi ;;
 	status)
 		config
 		if valid && [ "$(mounted_source)" = "//$server/$share" ]; then
 			printf '已挂载：//%s/%s → %s\n' "$server" "$share" "$target"
 		else printf '未挂载，或挂载源与当前设置不一致\n'; fi
-		[ ! -f /tmp/home-smb-state ] || cat /tmp/home-smb-state
+		[ ! -f "$run/state" ] || cat "$run/state"
 		exit 0 ;;
 	_mount)
 		config
 		[ "$enabled" = 1 ] || exit 0
 		if ! valid; then state '配置不完整或格式有误，请检查 NAS 地址、共享名和账号。'; exit 2; fi
 		actual=$(mounted_source)
-		if [ "$actual" = "//$server/$share" ]; then exit 0; fi
+		if [ "$actual" = "//$server/$share" ]; then
+			printf '%s\n%s\n' "$target" "//$server/$share" > "$run/active"
+			exit 0
+		fi
 		if [ -n "$actual" ]; then state '挂载点已被其他共享或文件系统占用，未进行覆盖。'; exit 3; fi
 		if [ -L "$target" ] || [ -L /etc/home-smb ] || [ -L /etc/home-smb/credentials ]; then
 			state '挂载点或凭据路径为符号链接，已停止操作。'; exit 3
@@ -74,6 +85,7 @@ case "${1:-status}" in
 		fi
 		state '正在连接 NAS；单次挂载最多等待约 17 秒。'
 		if mount.cifs "//$server/$share" "$target" -o "$auth,vers=$version,iocharset=utf8,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0770,nosuid,nodev,noexec,soft,echo_interval=15" >/dev/null 2>&1; then
+			printf '%s\n%s\n' "$target" "//$server/$share" > "$run/active"
 			state '挂载成功。NAS 连通性和下载写入权限由存储保护另行检查。'
 		else
 			state '挂载失败：请检查 NAS 可达性、共享权限、SMB 版本和用户名密码。'
@@ -81,14 +93,24 @@ case "${1:-status}" in
 		fi ;;
 	_unmount)
 		config
-		valid || exit 2
+		expected="//$server/$share"
+		# Retain the last managed mount identity across edited settings.
+		if [ -s "$run/active" ]; then
+			target=$(sed -n '1p' "$run/active")
+			expected=$(sed -n '2p' "$run/active")
+		fi
+		case "$target" in /mnt/*) leaf=${target#/mnt/} ;; *) exit 2 ;; esac
+		case "$leaf" in ''|.|..|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
 		actual=$(mounted_source)
 		[ -n "$actual" ] || { state '当前未挂载。'; exit 0; }
-		[ "$actual" = "//$server/$share" ] || { state '挂载源不匹配，未卸载其他共享。'; exit 3; }
+		[ "$actual" = "$expected" ] || { state '挂载源不匹配，未卸载其他共享。'; exit 3; }
 		# Do not let the downloader keep writing across a manual unmount.
 		if [ "$target" = /mnt/nas-downloads ] && [ -x /etc/init.d/transmission ]; then
 			/etc/init.d/transmission stop >/dev/null 2>&1 || true
 		fi
-		if umount "$target" >/dev/null 2>&1; then state '已卸载。'; else state '卸载失败，可能仍有文件正在使用。'; exit 5; fi ;;
+		if umount "$target" >/dev/null 2>&1; then
+			printf '' > "$run/active"
+			state '已卸载。'
+		else state '卸载失败，可能仍有文件正在使用。'; exit 5; fi ;;
 	*) exit 2 ;;
 esac

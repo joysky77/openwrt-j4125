@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Install and exercise the UI bundle in a snapshot of the delivered firmware."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -20,21 +21,28 @@ def main():
     image = next(firmware.glob('*squashfs-combined.img.gz'))
     raw = evidence.parent / 'ui-test-disk.img'
     decompress_image(image, raw)
+    media = evidence.parent / 'ui-test-bundle.img'
+    with media.open('xb') as stream:
+        stream.truncate(64 * 1024 * 1024)
+    subprocess.run(['mkfs.vfat', str(media)], check=True)
+    subprocess.run(['mcopy', '-i', str(media), *map(str, bundle.iterdir()), '::/'], check=True)
     log = evidence / 'serial.log'
     command = ['qemu-system-x86_64', '-machine', 'pc', '-accel', 'tcg', '-cpu', 'qemu64',
                '-m', '1536', '-smp', '2', '-nographic', '-monitor', 'none', '-no-reboot', '-snapshot',
                '-drive', f'file={raw},format=raw,if=ide,index=0',
-               '-drive', f'file=fat:ro:{bundle},format=raw,if=ide,index=1,readonly=on',
+               '-drive', f'file={media},format=raw,if=ide,index=1',
                '-netdev', 'user,id=net0,restrict=on,hostfwd=tcp:127.0.0.1:18080-:80',
                '-device', 'e1000,netdev=net0']
     setup = r'''
 tries=0
 while [ "$(cat /proc/sys/kernel/hostname)" = '(none)' ] && [ "$tries" -lt 60 ]; do sleep 2; tries=$((tries+1)); done
+tries=0
+while { ! grep -q ' /overlay ' /proc/mounts || ! ip link show br-lan >/dev/null 2>&1; } && [ "$tries" -lt 60 ]; do sleep 2; tries=$((tries+1)); done
 mkdir -p /mnt/ui-bundle
-mount -t vfat /dev/sdb1 /mnt/ui-bundle || echo UI_INSTALL_FAILED:mount
+mount -t vfat /dev/sdb /mnt/ui-bundle || echo UI_INSTALL_FAILED:mount
 cd /mnt/ui-bundle
 sha256sum -c SHA256SUMS || echo UI_INSTALL_FAILED:checksum
-apk add --no-network --allow-untrusted /mnt/ui-bundle/*.apk || echo UI_INSTALL_FAILED:apk
+sh /mnt/ui-bundle/install_ui_update.sh __MANIFEST_HASH__ || echo UI_INSTALL_FAILED:apk
 test -f /usr/lib/lua/luci/controller/homeui.lua || echo UI_INSTALL_FAILED:controller
 test "$(stat -c %a /etc/config/homesmb)" = 600 || echo UI_INSTALL_FAILED:permissions
 test "$(uci -q get homesmb.nas.enabled)" = 0 || echo UI_INSTALL_FAILED:default
@@ -71,6 +79,7 @@ echo HOME_UI_READY
         try:
             send('\n')
             wait_for(r'root@[^\r\n]+[#] ')
+            setup = setup.replace('__MANIFEST_HASH__', hashlib.sha256((bundle / 'SHA256SUMS').read_bytes()).hexdigest())
             send(setup)
             wait_for(r'^HOME_UI_READY\s*$', 300)
             from playwright.sync_api import sync_playwright

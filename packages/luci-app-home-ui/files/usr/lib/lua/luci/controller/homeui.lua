@@ -14,7 +14,7 @@ function status_json()
     local util = require "luci.util"
     local http = require "luci.http"
     local sys = require "luci.sys"
-    local result = {interfaces = {}, printers = {}, services = {}}
+    local result = {interfaces = {}, ports = {}, printers = {}, services = {}}
     local dump = util.ubus("network.interface", "dump", {}) or {}
     for _, item in ipairs(dump.interface or {}) do
         local addresses = {}
@@ -22,15 +22,27 @@ function status_json()
             addresses[#addresses + 1] = tostring(addr.address or "") .. "/" .. tostring(addr.mask or "")
         end
         local dev = tostring(item.l3_device or item.device or "")
-        local mac, speed = "", ""
+        local mac, speed, carrier = "", "", ""
         if dev:match("^[a-zA-Z0-9_.:-]+$") then
             mac = (fs.readfile("/sys/class/net/" .. dev .. "/address") or ""):gsub("%s+$", "")
             speed = (fs.readfile("/sys/class/net/" .. dev .. "/speed") or ""):gsub("%s+$", "")
+            carrier = (fs.readfile("/sys/class/net/" .. dev .. "/carrier") or ""):gsub("%s+$", "")
         end
         result.interfaces[#result.interfaces + 1] = {
             name = tostring(item.interface or ""), up = item.up == true,
-            device = dev, ipv4 = addresses, mac = mac, speed = tonumber(speed)
+            device = dev, ipv4 = addresses, mac = mac, speed = tonumber(speed), carrier = tonumber(carrier)
         }
+    end
+    for name in fs.dir("/sys/class/net") do
+        if name:match("^[a-zA-Z0-9_.:-]+$") and fs.access("/sys/class/net/" .. name .. "/device") then
+            local prefix = "/sys/class/net/" .. name
+            result.ports[#result.ports + 1] = {
+                name = name,
+                mac = (fs.readfile(prefix .. "/address") or ""):gsub("%s+$", ""),
+                carrier = tonumber(fs.readfile(prefix .. "/carrier") or ""),
+                speed = tonumber(fs.readfile(prefix .. "/speed") or "")
+            }
+        end
     end
     for _, name in ipairs({"dockerd", "zerotier", "p910nd", "transmission", "home-smb"}) do
         local service = util.ubus("service", "list", {name = name}) or {}

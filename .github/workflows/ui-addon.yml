@@ -31,7 +31,7 @@ jobs:
       - name: Install isolated test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 zstd
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 zstd dosfstools mtools
           python3 -m venv .ci-venv
           .ci-venv/bin/pip install playwright==1.56.0
           .ci-venv/bin/python -m playwright install --with-deps chromium

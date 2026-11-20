@@ -12,9 +12,13 @@
 <a href="<%=luci.dispatcher.build_url('admin','network','network')%>">全部接口／高级设置</a>
 </div>
 <div class="homeui-table-wrap"><table class="table homeui-table"><thead><tr class="tr"><th class="th">接口／用途</th><th class="th">状态</th><th class="th">设备</th><th class="th">IPv4 地址</th><th class="th">MAC</th><th class="th">设备速率</th></tr></thead><tbody id="homeui-interfaces"><tr><td colspan="6">正在读取接口信息…</td></tr></tbody></table></div>
+<h3>物理网络设备</h3>
+<div class="homeui-table-wrap"><table class="table"><thead><tr class="tr"><th class="th">设备名</th><th class="th">链路</th><th class="th">MAC</th><th class="th">速率</th></tr></thead><tbody id="homeui-ports"></tbody></table></div>
 <p class="homeui-note">默认按有线主用、Wi-Fi 手动备用使用。物理端口请结合设备名和 MAC 核对；接口速率不是宽带测速结果。USB 无线网卡接入后，可在无线设置中扫描并连接备用热点。</p>
 <script src="<%=resource%>/xhr.js"></script>
 <script>
-(function(){var roles={lan:'LAN · 局域网',wan:'WAN · 有线上网',wan6:'WAN6 · IPv6',wwan:'Wi-Fi · 备用上网'};XHR.poll(10,<%=require('luci.jsonc').stringify(luci.dispatcher.build_url('admin','services','home-tools','status'))%>,null,function(xhr,data){if(!data||!data.interfaces)return;var tbody=document.getElementById('homeui-interfaces');while(tbody.firstChild)tbody.removeChild(tbody.firstChild);data.interfaces.forEach(function(item){var tr=document.createElement('tr');tr.className='tr';[roles[item.name]||item.name,item.up?'已连接':'未连接',item.device||'—',(item.ipv4||[]).join('、')||'—',item.mac||'—',item.speed>0?item.speed+' Mbps':'—'].forEach(function(value){var td=document.createElement('td');td.className='td';td.textContent=value;tr.appendChild(td);});tbody.appendChild(tr);});});})();
+(function(){var roles={lan:'LAN · 局域网',wan:'WAN · 有线上网',wan6:'WAN6 · IPv6',wwan:'Wi-Fi · 备用上网'};
+function rows(id,items){var tbody=document.getElementById(id);while(tbody.firstChild)tbody.removeChild(tbody.firstChild);items.forEach(function(values){var tr=document.createElement('tr');tr.className='tr';values.forEach(function(value){var td=document.createElement('td');td.className='td';td.textContent=value;tr.appendChild(td);});tbody.appendChild(tr);});}
+XHR.poll(10,<%=require('luci.jsonc').stringify(luci.dispatcher.build_url('admin','services','home-tools','status'))%>,null,function(xhr,data){if(!data||!data.interfaces)return;rows('homeui-interfaces',data.interfaces.map(function(item){return [roles[item.name]||item.name,item.up?(item.carrier===0?'已启用／无链路':'已启用'):'未启用',item.device||'—',(item.ipv4||[]).join('、')||'—',item.mac||'—',item.speed>0?item.speed+' Mbps':'—'];}));rows('homeui-ports',(data.ports||[]).map(function(item){return [item.name,item.carrier===1?'已连接':'无链路',item.mac||'—',item.speed>0?item.speed+' Mbps':'—'];}));});})();
 </script>
 <%+footer%>
