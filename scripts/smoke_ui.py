@@ -120,8 +120,11 @@ echo HOME_UI_READY
                 page.screenshot(path=str(evidence / 'mobile-services.png'), full_page=True)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 2')
                 # Existing plugin routes must still load with the new theme.
+                page.set_viewport_size({'width': 1440, 'height': 1000})
                 for route in ['services/dockerman', 'services/p910nd', 'services/homezerotier', 'network/network']:
-                    page.goto(base + 'admin/' + route, wait_until='networkidle')
+                    response = page.goto(base + 'admin/' + route, wait_until='networkidle')
+                    page.screenshot(path=str(evidence / ('existing-' + route.split('/')[-1] + '.png')), full_page=True)
+                    assert response.status == 200, route
                     assert page.locator('body').inner_text().find('404 Not Found') < 0, route
                 browser.close()
             backend = r'''
