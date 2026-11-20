@@ -27,7 +27,7 @@ chmod 0700 /root/home-ui-backups "$backup" "$backup/cache"
 tar -czf "$backup/configs.tar.gz" /etc/config 2>/dev/null
 uci -q get luci.main.mediaurlbase > "$backup/previous-theme" || true
 printf '%s\n' 'Installing verified local packages...'
-apk add --no-network --allow-untrusted "$@"
+apk add --interactive=no --no-network --allow-untrusted "$@"
 chmod 0600 /etc/config/homesmb
 uci set luci.main.mediaurlbase=/luci-static/argon
 uci set luci.themes.Argon=/luci-static/argon

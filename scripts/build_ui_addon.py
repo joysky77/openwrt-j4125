@@ -35,7 +35,7 @@ def build(sdk, output, staging_root=None):
             raise RuntimeError('Upstream package SHA256 mismatch: ' + spec['name'])
     packages = [
         ('luci-app-home-ui', '0.2.0-r1', 'luci-base luci-compat cifsmount kmod-fs-cifs flock coreutils-timeout'),
-        ('luci-app-home-zerotier', '0.1.1-r1', 'luci-base luci-compat zerotier'),
+        ('luci-app-home-zerotier', '0.1.2-r1', 'luci-base luci-compat zerotier'),
     ]
     for name, version, depends in packages:
         # Preserve processing directories; no recursive cleanup of host files.

@@ -3,6 +3,7 @@ local m = Map("homesmb", "网络共享挂载 · SMB/CIFS", "把群晖或其他 N
 local s = m:section(NamedSection, "nas", "mount", "共享设置")
 s.addremove = false
 local status = s:option(DummyValue, "_status", "当前状态")
+status.template = "homeui/smb-status"
 function status.cfgvalue() return sys.exec("/usr/sbin/home-smb status 2>/dev/null"):sub(1, 1024) end
 s:option(Flag, "enabled", "启用并自动重连").rmempty = false
 local server = s:option(Value, "server", "NAS 地址", "IPv4 地址或主机名，例如 192.168.1.100；不填写 smb://。")

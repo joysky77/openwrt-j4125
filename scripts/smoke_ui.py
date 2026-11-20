@@ -44,7 +44,7 @@ cd /mnt/ui-bundle
 sha256sum -c SHA256SUMS || echo UI_INSTALL_FAILED:checksum
 sh /mnt/ui-bundle/install_ui_update.sh __MANIFEST_HASH__ || echo UI_INSTALL_FAILED:apk
 test -f /usr/lib/lua/luci/controller/homeui.lua || echo UI_INSTALL_FAILED:controller
-test "$(stat -c %a /etc/config/homesmb)" = 600 || echo UI_INSTALL_FAILED:permissions
+test "$(ls -l /etc/config/homesmb | awk '{print $1}')" = '-rw-------' || echo UI_INSTALL_FAILED:permissions
 test "$(uci -q get homesmb.nas.enabled)" = 0 || echo UI_INSTALL_FAILED:default
 uci set luci.main.mediaurlbase='/luci-static/argon'
 uci commit luci
@@ -89,11 +89,16 @@ echo HOME_UI_READY
                 page.route('**/*', lambda route: route.continue_() if route.request.url.startswith('http://127.0.0.1:18080/') else route.abort())
                 base = 'http://127.0.0.1:18080/cgi-bin/luci/'
                 page.goto(base, wait_until='networkidle')
+                page.screenshot(path=str(evidence / 'login.png'), full_page=True)
+                (evidence / 'login.html').write_text(page.content())
                 page.locator('input[name="luci_username"]').fill('root')
                 page.locator('input[name="luci_password"]').fill('home-ui-qemu-only')
                 page.locator('button[type="submit"], input[type="submit"]').first.click()
                 page.wait_for_timeout(3000)
+                page.screenshot(path=str(evidence / 'after-login.png'), full_page=True)
                 page.goto(base + 'admin/services/home-tools', wait_until='networkidle')
+                (evidence / 'home-services.html').write_text(page.content())
+                page.screenshot(path=str(evidence / 'home-services-attempt.png'), full_page=True)
                 page.locator('.homeui-card').first.wait_for()
                 assert page.locator('.homeui-card').count() == 8
                 page.wait_for_timeout(1500)
@@ -131,8 +136,8 @@ printf '#!/bin/sh\nprintf "%%s\\n" "$@" > /tmp/ui-mount-arguments\nexit 1\n' > /
 chmod 755 /usr/sbin/mount.cifs
 errors=0
 home-smb mount && errors=$((errors+1))
-test "$(stat -c %a /etc/home-smb/credentials)" = 600 || errors=$((errors+1))
-test "$(stat -c %a /mnt/ui-test)" = 700 || errors=$((errors+1))
+test "$(ls -l /etc/home-smb/credentials | awk '{print $1}')" = '-rw-------' || errors=$((errors+1))
+test "$(ls -ld /mnt/ui-test | awk '{print $1}')" = 'drwx------' || errors=$((errors+1))
 grep -q 'password=QEMU-test,secret=$(false)' /etc/home-smb/credentials || errors=$((errors+1))
 if grep -q QEMU-test /tmp/ui-mount-arguments; then errors=$((errors+1)); fi
 uci set homesmb.nas.target=/etc

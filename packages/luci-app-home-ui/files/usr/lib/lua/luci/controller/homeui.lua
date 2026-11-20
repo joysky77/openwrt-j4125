@@ -57,6 +57,7 @@ function status_json()
             if name:match("^lp%d+$") then result.printers[#result.printers + 1] = "/dev/usb/" .. name end
         end
     end
+    result.smb_status = sys.exec("/usr/sbin/home-smb status 2>/dev/null"):sub(1, 1024)
     -- Do not return UCI objects, passwords, PPP credentials, or Docker tokens.
     http.prepare_content("application/json")
     http.write_json(result)

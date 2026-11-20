@@ -56,6 +56,6 @@ uci commit luci
 
 ## 版本及验证
 
-界面插件 luci-app-home-ui 0.2.0-r1；ZeroTier 页面 0.1.1-r1；Argon 3.1.4 与配套简体中文。新增两个用户态依赖 wget-ssl、libpcre2 来自 OpenWrt 25.12.6 对应的软件仓库，不更换内核模块。
+界面插件 luci-app-home-ui 0.2.0-r1；ZeroTier 页面 0.1.2-r1（补齐包管理清单，保留旧 0.1.1 包）；Argon 3.1.4 与配套简体中文。新增两个用户态依赖 wget-ssl、libpcre2 来自 OpenWrt 25.12.6 对应的软件仓库，不更换内核模块。
 
 云端在原交付固件的 QEMU 副本中检查安装、登录、桌面/手机布局、原有插件路由及 SMB 凭据权限；结果以随包交付的 validation.json 和截图为准。实机端口、真实群晖挂载/断线、实际打印和长期稳定性仍须现场验证。

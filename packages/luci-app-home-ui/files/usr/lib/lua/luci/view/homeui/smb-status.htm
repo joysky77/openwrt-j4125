@@ -1,0 +1,7 @@
+<%+cbi/valueheader%>
+<span id="homeui-smb-live"><%=pcdata(self:cfgvalue(section) or '')%></span>
+<script src="<%=resource%>/xhr.js"></script>
+<script>
+XHR.poll(10,<%=require('luci.jsonc').stringify(luci.dispatcher.build_url('admin','services','home-tools','status'))%>,null,function(xhr,data){if(data&&typeof data.smb_status==='string'){document.getElementById('homeui-smb-live').textContent=data.smb_status;}});
+</script>
+<%+cbi/valuefooter%>

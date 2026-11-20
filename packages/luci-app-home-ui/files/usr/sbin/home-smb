@@ -11,18 +11,17 @@ mkdir -p "$run"
 chmod 0700 "$run"
 state() { printf '%s\n' "$1" > "$run/state"; }
 config() {
-	. /lib/functions.sh
-	config_load homesmb
-	config_get enabled nas enabled 0
-	config_get server nas server
-	config_get share nas share
-	config_get username nas username
-	config_get password nas password
-	config_get domain nas domain
-	config_get guest nas guest 0
-	config_get target nas target /mnt/nas-downloads
-	config_get version nas version 3.0
-	config_get owner nas owner transmission
+	# UCI values are captured as data, never sourced or evaluated as code.
+	enabled=$(uci -q get homesmb.nas.enabled || printf 0)
+	server=$(uci -q get homesmb.nas.server || true)
+	share=$(uci -q get homesmb.nas.share || true)
+	username=$(uci -q get homesmb.nas.username || true)
+	password=$(uci -q get homesmb.nas.password || true)
+	domain=$(uci -q get homesmb.nas.domain || true)
+	guest=$(uci -q get homesmb.nas.guest || printf 0)
+	target=$(uci -q get homesmb.nas.target || printf /mnt/nas-downloads)
+	version=$(uci -q get homesmb.nas.version || printf 3.0)
+	owner=$(uci -q get homesmb.nas.owner || printf transmission)
 }
 valid() {
 	case "$server" in ''|*[!a-zA-Z0-9.-]*|.*|-*) return 1 ;; esac
