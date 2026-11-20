@@ -53,3 +53,21 @@
 剩余数据区约 107.51GiB（格式化前），目录预算调整为 Docker/应用 32GiB、rclone 缓存目标 16GiB、可选本地下载 24GiB、备份/日志 5GiB，余量约 30.51GiB，再扣除文件系统开销。群晖仍承担默认下载文件，本地低空间目标保持 30GiB 预警/20GiB 保护。
 
 本地规划保存为 docs/定制方案-v0.5.md 和 configs/storage-plan-v0.5.json；候选版本目录新增安装说明-120GB-v1.1.md 及独立校验文件。旧规划、旧安装说明、原 SHA256SUMS 与两个镜像均保持不变。尚未对真实设备分区或应用服务配置。
+
+## 2026-11-19 ZeroTier 网页补丁
+
+用户已确认实机为 OpenWrt 25.12.6。交付 manifest 有 zerotier 1.16.2，但遗漏网页配置插件。新增独立包 luci-app-home-zerotier 0.1.1-r1，匹配锁定服务的 global/network UCI 格式。默认不接管默认路由/DNS，不自动修改防火墙。
+
+在 D:\AiTemp\openwrt-cloud-tools 的独立虚拟环境运行 Lua 5.1 检查，使用交付 SDK 内置 apk-tools 3.0.5 对四个架构无关的 LuCI 文件直接打包，并完成包校验、解包比对和 root:root 文件权限检查。SDK 常规 make 的宿主依赖检查未通过（DrvFS 大小写、ncurses、unzip），未安装宿主依赖或强行执行完整构建。
+
+安装包和带固件版本/SHA256 检查的 Windows 安装脚本保存在 releases/addons/zerotier-0.1.1。此包没有公共源签名，安装仅对该已核验文件使用 --allow-untrusted。尚未操作实机，实际 LuCI 菜单、保存应用及 ZeroTier 网络连通性仍待用户安装验证。未重建镜像、未修改历史交付包、未推送仓库。
+
+## 2026-11-20 家庭管理界面更新 0.2.0
+
+新增 Argon 3.1.4（含中文）、家庭服务入口、常用网络状态与设置入口、SMB/CIFS 客户端管理。保留现有 Dockerman JS 与 p910nd；纳入 ZeroTier 页面 0.1.2-r1。独立更新六个 APK 合计约 0.75MiB，安装器备份配置并重启网页服务，不修改网络参数或重写磁盘。
+
+源码和后续整包配置在 codex/home-ui-0.2.0 分支，验证提交 c9de12fc1f6d616f246f5e67ccea9e62a0960b9a；整包下一候选配置为 0.2.0-rc1，历史 0.1.0-rc1 镜像不变。本次没有启动新的整包编译。
+
+云端 run 44746800232 成功：原交付固件 QEMU 安装、Argon 登录、桌面与手机页面、现有插件 HTTP 200、SMB 网页保存应用、后台服务重载和密码保护均通过。此前测试发现并修复了虚拟测试介质兼容、stat 命令假设、CBI 未勾选 Flag 的依赖条件、UCI shell 严格模式及 procd 重载行为；不把安装包能生成作为业务通过的依据。
+
+实际安装包位于 releases/addons/home-ui-0.2.0，六包下载 SHA256 和 Windows PowerShell 5.1 校验模式通过，附 validation.json 与截图。未在小主机安装，真实群晖/打印及长期稳定性仍未验收；不宣称完成了实机部署。
