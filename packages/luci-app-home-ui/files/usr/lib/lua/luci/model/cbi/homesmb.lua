@@ -27,10 +27,10 @@ local guest = s:option(Flag, "guest", "访客访问", "通常保持关闭，使�
 guest.default = "0"
 guest.rmempty = false
 local username = s:option(Value, "username", "用户名")
-username:depends("guest", "0")
+username:depends({guest = "1", ["!reverse"] = true})
 local password = s:option(Value, "password", "密码")
 password.password = true
-password:depends("guest", "0")
+password:depends({guest = "1", ["!reverse"] = true})
 local domain = s:option(Value, "domain", "域／工作组（可选）")
 for _, option in ipairs({username, password, domain}) do
     function option.validate(self, value)

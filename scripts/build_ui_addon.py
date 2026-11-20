@@ -71,6 +71,7 @@ def build(sdk, output, staging_root=None):
     shutil.copyfile(ROOT / 'scripts/install_ui_update.sh', output / 'install_ui_update.sh')
     installer = (ROOT / 'scripts/Install-Home-UI-0.2.0.ps1').read_text()
     installer = installer.replace('__BUNDLE_SHA256__', digest(output / 'SHA256SUMS'))
+    installer = installer.replace('__INSTALLER_SHA256__', digest(output / 'install_ui_update.sh'))
     (output / 'Install-Home-UI-0.2.0.ps1').write_text(installer)
     guide = ROOT / 'docs/UI-UPDATE-0.2.0.md'
     if guide.exists():

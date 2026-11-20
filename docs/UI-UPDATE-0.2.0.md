@@ -12,6 +12,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "Y:\openwrt\releases\addons\
 
 按提示输入软路由管理 IPv4 地址和 root 密码（通常 3 次）。首次 SSH 连接请核对设备指纹。Windows 需具备 OpenSSH 客户端 ssh.exe 和 scp.exe。
 
+如果尚未设置 root 密码，先在路由器“系统 → 管理权”设置。脚本将设备 SSH 指纹保存在更新目录的 ssh-known-hosts 文件，临时上传目录在路由器 /tmp/，不把过程文件放在 Windows C 盘。
+
 安装器核对全部包的 SHA256、路由器版本、架构及剩余空间，再进行离线安装。它会在路由器 `/root/home-ui-backups/` 保存受限权限的配置备份和旧界面缓存，不导出到公共仓库或 Windows。安装后重启网页服务，SSH 和网络接口不重启；浏览器刷新，必要时按 Ctrl+F5。
 
 本地包没有公共源签名，本次安装对这些已校验文件使用 `--allow-untrusted`，不修改全局信任设置、不更新软件源、不批量升级系统包。

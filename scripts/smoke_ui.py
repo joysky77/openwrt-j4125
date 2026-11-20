@@ -85,7 +85,7 @@ echo HOME_UI_READY
             from playwright.sync_api import sync_playwright
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])
-                page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+                page = browser.new_page(viewport={'width': 1440, 'height': 1000}, locale='zh-CN')
                 page.route('**/*', lambda route: route.continue_() if route.request.url.startswith('http://127.0.0.1:18080/') else route.abort())
                 base = 'http://127.0.0.1:18080/cgi-bin/luci/'
                 page.goto(base, wait_until='networkidle')
@@ -110,6 +110,8 @@ echo HOME_UI_READY
                 assert response.status == 200 and response.json()['interfaces']
                 assert 'password' not in response.text().lower()
                 page.goto(base + 'admin/services/home-smb', wait_until='networkidle')
+                (evidence / 'smb.html').write_text(page.content())
+                page.screenshot(path=str(evidence / 'smb-attempt.png'), full_page=True)
                 page.locator('input[type="password"]').wait_for()
                 page.screenshot(path=str(evidence / 'desktop-smb.png'), full_page=True)
                 page.set_viewport_size({'width': 390, 'height': 844})
