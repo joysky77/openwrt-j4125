@@ -114,6 +114,14 @@ echo HOME_UI_READY
                 page.screenshot(path=str(evidence / 'smb-attempt.png'), full_page=True)
                 page.locator('input[type="password"]').wait_for()
                 page.screenshot(path=str(evidence / 'desktop-smb.png'), full_page=True)
+                page.locator('input[name="cbid.homesmb.nas.server"]').fill('192.0.2.10')
+                page.locator('input[name="cbid.homesmb.nas.share"]').fill('WebSaveTest')
+                page.locator('input[name="cbid.homesmb.nas.username"]').fill('qemu-test')
+                page.locator('input[name="cbid.homesmb.nas.password"]').fill('qemu-form-secret')
+                page.locator('input.cbi-button-apply[type="button"]').click()
+                page.wait_for_timeout(5000)
+                send("tries=0; while [ \"$(uci -q get homesmb.nas.share)\" != WebSaveTest ] && [ \"$tries\" -lt 20 ]; do sleep 1; tries=$((tries+1)); done; echo UI_FORM_SAVED:$(uci -q get homesmb.nas.share)\n")
+                wait_for(r'^UI_FORM_SAVED:WebSaveTest\s*$', 40)
                 page.set_viewport_size({'width': 390, 'height': 844})
                 page.goto(base + 'admin/services/home-tools', wait_until='networkidle')
                 page.locator('.homeui-card').first.wait_for()
@@ -143,8 +151,16 @@ errors=0
 home-smb mount && errors=$((errors+1))
 test "$(ls -l /etc/home-smb/credentials | awk '{print $1}')" = '-rw-------' || errors=$((errors+1))
 test "$(ls -ld /mnt/ui-test | awk '{print $1}')" = 'drwx------' || errors=$((errors+1))
-grep -q 'password=QEMU-test,secret=$(false)' /etc/home-smb/credentials || errors=$((errors+1))
+grep -Fq 'password=QEMU-test,secret=$(false)' /etc/home-smb/credentials || errors=$((errors+1))
 if grep -q QEMU-test /tmp/ui-mount-arguments; then errors=$((errors+1)); fi
+/etc/init.d/home-smb start
+sleep 2
+uci set homesmb.nas.password=QEMU-reloaded-secret
+uci commit homesmb
+/etc/init.d/home-smb reload
+sleep 2
+grep -Fq 'password=QEMU-reloaded-secret' /etc/home-smb/credentials || errors=$((errors+1))
+/etc/init.d/home-smb stop
 uci set homesmb.nas.target=/etc
 home-smb mount && errors=$((errors+1))
 echo HOME_UI_BACKEND_RESULT:$errors
@@ -155,6 +171,7 @@ echo HOME_UI_BACKEND_RESULT:$errors
                 'baseline_openwrt': '25.12.6', 'apk_install': True, 'argon_login': True,
                 'desktop_pages': True, 'mobile_layout': True, 'existing_plugin_routes': True,
                 'smb_credential_permissions': True, 'smb_no_password_in_argv': True,
+                'smb_web_save_apply': True, 'smb_service_reload': True,
                 'smb_invalid_target_rejected': True, 'real_nas_mount': False,
                 'physical_router_tested': False}, indent=2) + '\n')
         finally:

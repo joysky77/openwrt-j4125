@@ -11,8 +11,14 @@ start_service() {
 	procd_set_param stderr 0
 	procd_close_instance
 }
-stop_service() {
+service_stopped() {
 	/usr/sbin/home-smb unmount >/dev/null 2>&1 || true
+}
+reload_service() {
+	# A source or credential change needs a real remount, not only procd's
+	# comparison of the unchanged worker command line.
+	stop
+	start
 }
 service_triggers() {
 	procd_add_reload_trigger homesmb
