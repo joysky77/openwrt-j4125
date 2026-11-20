@@ -1,0 +1,7 @@
+{
+  "luci-app-home-ui": {
+    "description": "Home router pages and SMB mount configuration",
+    "read": {"uci": ["homesmb"]},
+    "write": {"uci": ["homesmb"]}
+  }
+}

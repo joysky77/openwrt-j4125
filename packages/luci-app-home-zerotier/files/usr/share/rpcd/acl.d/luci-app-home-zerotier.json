@@ -1,0 +1,7 @@
+{
+  "luci-app-home-zerotier": {
+    "description": "Configure the ZeroTier client",
+    "read": {"uci": ["zerotier"]},
+    "write": {"uci": ["zerotier"]}
+  }
+}

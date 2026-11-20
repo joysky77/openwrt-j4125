@@ -41,3 +41,8 @@ luci-app-passwall2
 xray-core
 sing-box
 home-router-tools
+luci-app-home-zerotier
+luci-app-home-ui
+luci-theme-argon
+luci-i18n-argon-config-zh-cn
+wget-ssl

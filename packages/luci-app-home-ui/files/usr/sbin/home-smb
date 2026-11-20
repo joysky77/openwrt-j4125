@@ -1,0 +1,94 @@
+#!/bin/sh
+# Credentials are read from UCI and written to a root-only file, never argv.
+# Mount workers inherit the lock. A blocked kernel mount cannot accumulate
+# concurrent retries, and procd start does not wait for a network operation.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+state() { printf '%s\n' "$1" > /tmp/home-smb-state; }
+config() {
+	. /lib/functions.sh
+	config_load homesmb
+	config_get enabled nas enabled 0
+	config_get server nas server
+	config_get share nas share
+	config_get username nas username
+	config_get password nas password
+	config_get domain nas domain
+	config_get guest nas guest 0
+	config_get target nas target /mnt/nas-downloads
+	config_get version nas version 3.0
+	config_get owner nas owner transmission
+}
+valid() {
+	case "$server" in ''|*[!a-zA-Z0-9.-]*|.*|-*) return 1 ;; esac
+	case "$share" in ''|*[[:space:][:cntrl:]/\\]*) return 1 ;; esac
+	case "$target" in /mnt/*) leaf=${target#/mnt/} ;; *) return 1 ;; esac
+	case "$leaf" in ''|.|..|*[!a-zA-Z0-9_-]*) return 1 ;; esac
+	case "$version" in 3.0|3.1.1) ;; *) return 1 ;; esac
+	case "$owner" in root|transmission) ;; *) return 1 ;; esac
+	case "$guest" in 0|1) ;; *) return 1 ;; esac
+	# credentials files cannot represent CR/LF within a value.
+	for value in "$username" "$password" "$domain"; do
+		case "$value" in *[[:cntrl:]]*) return 1 ;; esac
+	done
+	[ "$guest" = 1 ] || [ -n "$username" ] || return 1
+}
+mounted_source() { awk -v point="$target" '$2==point {print $1}' /proc/mounts; }
+case "${1:-status}" in
+	worker)
+		while :; do "$0" mount >/dev/null 2>&1 || true; sleep 30; done ;;
+	mount|unmount)
+		exec 9>/tmp/home-smb.lock
+		flock -n 9 || exit 75
+		exec timeout -k 2 15 "$0" "_${1}" ;;
+	status)
+		config
+		if valid && [ "$(mounted_source)" = "//$server/$share" ]; then
+			printf '已挂载：//%s/%s → %s\n' "$server" "$share" "$target"
+		else printf '未挂载，或挂载源与当前设置不一致\n'; fi
+		[ ! -f /tmp/home-smb-state ] || cat /tmp/home-smb-state
+		exit 0 ;;
+	_mount)
+		config
+		[ "$enabled" = 1 ] || exit 0
+		if ! valid; then state '配置不完整或格式有误，请检查 NAS 地址、共享名和账号。'; exit 2; fi
+		actual=$(mounted_source)
+		if [ "$actual" = "//$server/$share" ]; then exit 0; fi
+		if [ -n "$actual" ]; then state '挂载点已被其他共享或文件系统占用，未进行覆盖。'; exit 3; fi
+		if [ -L "$target" ] || [ -L /etc/home-smb ] || [ -L /etc/home-smb/credentials ]; then
+			state '挂载点或凭据路径为符号链接，已停止操作。'; exit 3
+		fi
+		uid=$(id -u "$owner")
+		gid=$(id -g "$owner")
+		umask 077
+		mkdir -p /etc/home-smb "$target"
+		# The unmounted local directory must never accept downloader writes.
+		chmod 0700 "$target"
+		chmod 0700 /etc/home-smb
+		chmod 0600 /etc/config/homesmb
+		if [ "$guest" = 1 ]; then auth=guest; else
+			{ printf 'username=%s\npassword=%s\ndomain=%s\n' "$username" "$password" "$domain"; } > /etc/home-smb/credentials
+			chmod 0600 /etc/home-smb/credentials
+			auth=credentials=/etc/home-smb/credentials
+		fi
+		state '正在连接 NAS；单次挂载最多等待约 17 秒。'
+		if mount.cifs "//$server/$share" "$target" -o "$auth,vers=$version,iocharset=utf8,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0770,nosuid,nodev,noexec,soft,echo_interval=15" >/dev/null 2>&1; then
+			state '挂载成功。NAS 连通性和下载写入权限由存储保护另行检查。'
+		else
+			state '挂载失败：请检查 NAS 可达性、共享权限、SMB 版本和用户名密码。'
+			exit 4
+		fi ;;
+	_unmount)
+		config
+		valid || exit 2
+		actual=$(mounted_source)
+		[ -n "$actual" ] || { state '当前未挂载。'; exit 0; }
+		[ "$actual" = "//$server/$share" ] || { state '挂载源不匹配，未卸载其他共享。'; exit 3; }
+		# Do not let the downloader keep writing across a manual unmount.
+		if [ "$target" = /mnt/nas-downloads ] && [ -x /etc/init.d/transmission ]; then
+			/etc/init.d/transmission stop >/dev/null 2>&1 || true
+		fi
+		if umount "$target" >/dev/null 2>&1; then state '已卸载。'; else state '卸载失败，可能仍有文件正在使用。'; exit 5; fi ;;
+	*) exit 2 ;;
+esac

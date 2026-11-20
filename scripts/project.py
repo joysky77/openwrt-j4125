@@ -28,7 +28,7 @@ def required():
 
 def validate():
     lock = lock_data()
-    for source in [lock['openwrt'], *lock['feeds'].values()]:
+    for source in [lock['openwrt'], *lock['feeds'].values(), *lock.get('external_packages', {}).values()]:
         if not re.fullmatch(r'[0-9a-f]{40}', source['commit']):
             raise ValueError('Sources must use full immutable commit IDs')
         if not re.fullmatch(r'https://github.com/[\w.-]+/[\w.-]+\.git', source['url']):
@@ -41,7 +41,7 @@ def validate():
     if len(required()) != len(set(required())):
         raise ValueError('Duplicate required packages')
     for path in ROOT.rglob('*'):
-        if not path.is_file() or any(p in ('.git', 'build', 'artifacts', '.venv') for p in path.parts):
+        if not path.is_file() or any(p in ('.git', 'build', 'artifacts', '.venv', 'releases', 'downloads', 'private', 'backups') for p in path.parts):
             continue
         if path.name.startswith('storage-plan-'):
             continue
@@ -65,7 +65,17 @@ def prepare(destination):
                   for name, source in lock['feeds'].items()]
     (destination / 'feeds.conf').write_text('\n'.join(feed_lines) + '\n')
     shutil.copyfile(ROOT / 'configs/x86-64.config', destination / '.config')
-    shutil.copytree(ROOT / 'packages/home-router-tools', destination / 'package/home-router-tools')
+    for package in (ROOT / 'packages').iterdir():
+        if package.is_dir() and (package / 'Makefile').is_file():
+            shutil.copytree(package, destination / 'package' / package.name)
+    for name, source in lock.get('external_packages', {}).items():
+        if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
+            raise ValueError('Invalid external package name')
+        folder = destination / 'package' / name
+        run(['git', 'init', str(folder)])
+        run(['git', 'remote', 'add', 'origin', source['url']], folder)
+        run(['git', 'fetch', '--depth=1', 'origin', source['commit']], folder)
+        run(['git', 'checkout', '--detach', 'FETCH_HEAD'], folder)
     print(f'Prepared immutable source: {destination}')
 
 

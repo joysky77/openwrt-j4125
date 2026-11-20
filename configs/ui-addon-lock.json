@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "openwrt_release": "25.12.6",
+  "baseline_build_run": "43427357911",
+  "baseline_artifact": "firmware-candidate-6-1",
+  "sdk_artifact": "expansion-kit-6-1",
+  "packages": [
+    {"name": "luci-theme-argon-3.1.4-r1.apk", "url": "https://github.com/jerrykuku/luci-theme-argon/releases/download/v3.1.4/luci-theme-argon-3.1.4-r1.apk", "sha256": "7c9cfc8ab119d33856294f0959f2c267fd20471d5a2326218f3b316a6bd82ca1"},
+    {"name": "luci-i18n-argon-config-zh-cn-3.1.4-r1.apk", "url": "https://github.com/jerrykuku/luci-theme-argon/releases/download/v3.1.4/luci-i18n-argon-config-zh-cn-3.1.4-r1.apk", "sha256": "84cfcc87e2ce7d5b157d64fa496139a3386fba6b6ee0eca88ff2f0e9283e7657"},
+    {"name": "wget-ssl-1.25.0-r3.apk", "url": "https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/packages/wget-ssl-1.25.0-r3.apk", "sha256": "947c9a1d81739ed594ade022ae1b5da7d08b45e9ffa45da2bce3762334b76903"},
+    {"name": "libpcre2-10.47-r1.apk", "url": "https://downloads.openwrt.org/releases/25.12.6/packages/x86_64/base/libpcre2-10.47-r1.apk", "sha256": "1d39bb696d6051fa3a8da7380c07e091da857827c4822381f9ea4d1104e5afca"}
+  ]
+}

@@ -1,0 +1,29 @@
+<%+header%>
+<style>
+.homeui-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin:18px 0}.homeui-card{display:block;padding:20px;border:1px solid rgba(128,128,128,.25);border-radius:12px;color:inherit!important;text-decoration:none!important;background:rgba(128,128,128,.035)}.homeui-card:hover{border-color:#5e72e4;box-shadow:0 3px 12px rgba(0,0,0,.08)}.homeui-card strong{display:block;font-size:18px;margin-bottom:9px}.homeui-card p{line-height:1.7;opacity:.8;margin:0 0 10px}.homeui-state{font-size:13px;opacity:.8}.homeui-note{padding:12px 16px;border-left:3px solid #5e72e4;line-height:1.8;margin:14px 0}
+</style>
+<h2>家庭服务</h2>
+<p>常用功能集中在这里。服务状态每 10 秒刷新，点击卡片进入设置。</p>
+<div class="homeui-grid" id="homeui-cards"></div>
+<div class="homeui-note">下载任务在软路由运行，文件可保存到群晖。首次使用网络共享时，请先完成挂载和存储保护配置，再启用下载。</div>
+<p><a class="cbi-button" href="<%=luci.dispatcher.build_url('admin','system','system')%>">语言与主题</a> <a class="cbi-button" href="<%=luci.dispatcher.build_url('admin','system','package-manager')%>">软件包管理</a></p>
+<script src="<%=resource%>/xhr.js"></script>
+<script>
+(function(){
+var base=<%=require('luci.jsonc').stringify(luci.dispatcher.build_url('admin'))%>;
+var cards=[
+['常用网络设置','有线上网、LAN、接口状态与网络诊断。','network/home-settings',''],
+['Docker 容器','管理容器、镜像、网络和存储卷。','services/dockerman','dockerd'],
+['群晖／SMB 网络共享','配置共享地址和账号，查看挂载状态并重试。','services/home-smb','home-smb'],
+['USB 打印','接入 USB 打印机，配置 p910nd 打印服务。','services/p910nd','p910nd'],
+['ZeroTier 远程网络','填写 Network ID，查看节点并加入远程网络。','services/homezerotier','zerotier'],
+['BT 下载','管理 Transmission 的下载和做种任务。','services/transmission','transmission'],
+['家庭上网控制','孩子设备的夜间禁网和群晖下载存储保护。','services/homerouter',''],
+['网络诊断','检查网络连通性、域名解析与路由。','network/diagnostics','']
+];
+var root=document.getElementById('homeui-cards');
+cards.forEach(function(c){var a=document.createElement('a');a.className='homeui-card';a.href=base+'/'+c[2];var title=document.createElement('strong');title.textContent=c[0];var p=document.createElement('p');p.textContent=c[1];a.appendChild(title);a.appendChild(p);if(c[3]){var s=document.createElement('span');s.className='homeui-state';s.id='homeui-'+c[3];s.textContent='正在读取状态…';a.appendChild(s);}root.appendChild(a);});
+XHR.poll(10,base+'/services/home-tools/status',null,function(xhr,data){if(!data||!data.services)return;Object.keys(data.services).forEach(function(name){var node=document.getElementById('homeui-'+name);if(node)node.textContent=data.services[name]?'● 运行中':'○ 未运行／尚未配置';});var printer=document.getElementById('homeui-p910nd');if(printer&&data.printers)printer.textContent+=' · '+(data.printers.length?data.printers.join('、'):'未检测到 USB 打印设备');});
+})();
+</script>
+<%+footer%>

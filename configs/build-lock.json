@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "firmware_version": "0.1.0-rc1",
+  "firmware_version": "0.2.0-rc1",
   "openwrt_release": "25.12.6",
   "openwrt": {"url": "https://github.com/openwrt/openwrt.git", "commit": "64900e756efa667774214f9c6b17c113222e01f7"},
   "feeds": {
@@ -9,6 +9,9 @@
     "routing": {"url": "https://github.com/openwrt/routing.git", "commit": "48c808034414a2112cf9d5261a20a320e8d0d170"},
     "passwall_packages": {"url": "https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git", "commit": "b094b79c32ac4e4de3113a5c44971c6182eee535"},
     "passwall2": {"url": "https://github.com/Openwrt-Passwall/openwrt-passwall2.git", "commit": "24baf7cffdb34272adb8f8b31d6ad901596c3f61"}
+  },
+  "external_packages": {
+    "luci-theme-argon": {"url": "https://github.com/jerrykuku/luci-theme-argon.git", "commit": "c5c0873e122dc767c7ab0198c8bffc6e952b5cfb"}
   },
   "actions": {
     "checkout": "11d5960a326750d5838078e36cf38b85af677262",

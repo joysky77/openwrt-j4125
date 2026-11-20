@@ -1,0 +1,20 @@
+<%+header%>
+<h2>常用网络设置</h2>
+<p>先查看接口状态，再进入对应设置。修改网络仍使用 LuCI 的保存、应用及确认回退流程。</p>
+<style>.homeui-links{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.homeui-links a{padding:13px 18px;border:1px solid rgba(128,128,128,.3);border-radius:8px;color:inherit!important}.homeui-table-wrap{overflow-x:auto}.homeui-note{line-height:1.8;padding:12px 0}.homeui-table td{white-space:nowrap}</style>
+<div class="homeui-links">
+<a href="<%=luci.dispatcher.build_url('admin','network','network')%>#cbi-network-wan">有线上网 · 编辑 WAN</a>
+<a href="<%=luci.dispatcher.build_url('admin','network','network')%>#cbi-network-lan">局域网 · 编辑 LAN</a>
+<a href="<%=luci.dispatcher.build_url('admin','network','dhcp')%>">DHCP 与地址分配</a>
+<a href="<%=luci.dispatcher.build_url('admin','status','overview')%>">连接设备与租约</a>
+<a href="<%=luci.dispatcher.build_url('admin','network','wireless')%>">Wi-Fi 备用上网</a>
+<a href="<%=luci.dispatcher.build_url('admin','network','diagnostics')%>">网络诊断</a>
+<a href="<%=luci.dispatcher.build_url('admin','network','network')%>">全部接口／高级设置</a>
+</div>
+<div class="homeui-table-wrap"><table class="table homeui-table"><thead><tr class="tr"><th class="th">接口／用途</th><th class="th">状态</th><th class="th">设备</th><th class="th">IPv4 地址</th><th class="th">MAC</th><th class="th">设备速率</th></tr></thead><tbody id="homeui-interfaces"><tr><td colspan="6">正在读取接口信息…</td></tr></tbody></table></div>
+<p class="homeui-note">默认按有线主用、Wi-Fi 手动备用使用。物理端口请结合设备名和 MAC 核对；接口速率不是宽带测速结果。USB 无线网卡接入后，可在无线设置中扫描并连接备用热点。</p>
+<script src="<%=resource%>/xhr.js"></script>
+<script>
+(function(){var roles={lan:'LAN · 局域网',wan:'WAN · 有线上网',wan6:'WAN6 · IPv6',wwan:'Wi-Fi · 备用上网'};XHR.poll(10,<%=require('luci.jsonc').stringify(luci.dispatcher.build_url('admin','services','home-tools','status'))%>,null,function(xhr,data){if(!data||!data.interfaces)return;var tbody=document.getElementById('homeui-interfaces');while(tbody.firstChild)tbody.removeChild(tbody.firstChild);data.interfaces.forEach(function(item){var tr=document.createElement('tr');tr.className='tr';[roles[item.name]||item.name,item.up?'已连接':'未连接',item.device||'—',(item.ipv4||[]).join('、')||'—',item.mac||'—',item.speed>0?item.speed+' Mbps':'—'].forEach(function(value){var td=document.createElement('td');td.className='td';td.textContent=value;tr.appendChild(td);});tbody.appendChild(tr);});});})();
+</script>
+<%+footer%>

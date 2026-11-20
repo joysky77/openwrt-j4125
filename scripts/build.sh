@@ -30,9 +30,9 @@ python3 - "$PROJECT/configs/x86-64.config" <<'PY'
 import re, subprocess, sys
 text=open(sys.argv[1]).read()
 packages=re.findall(r'^CONFIG_PACKAGE_([^=]+)=y$', text, re.M)
-skip={'home-router-tools','luci-app-passwall2'}
+skip={'home-router-tools','luci-app-home-ui','luci-app-home-zerotier','luci-theme-argon','luci-app-passwall2'}
 # Kconfig suboptions are not standalone package recipes.
-packages=[p for p in packages if p not in skip and not p.startswith(('kmod-', 'luci-app-passwall2_', 'dnsmasq_'))]
+packages=[p for p in packages if p not in skip and not p.startswith(('kmod-', 'luci-app-passwall2_', 'luci-i18n-argon-config-', 'dnsmasq_'))]
 subprocess.run(['./scripts/feeds','install',*packages],check=True)
 PY
 python3 "$PROJECT/scripts/project.py" patch-transmission --source "$BUILD_SOURCE"

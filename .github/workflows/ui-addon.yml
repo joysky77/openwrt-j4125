@@ -1,0 +1,57 @@
+name: Build and verify UI update
+on:
+  push:
+    branches: ["codex/home-ui-*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ui-addon-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Validate source
+        run: |
+          python3 scripts/project.py validate
+          python3 -m unittest discover -s tests -v
+      - name: Download matching SDK and delivered firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/ui-sdk artifacts/ui-firmware artifacts/ui-evidence
+          gh run download 43427357911 --repo "$GITHUB_REPOSITORY" --name expansion-kit-6-1 --dir artifacts/ui-sdk
+          gh run download 43427357911 --repo "$GITHUB_REPOSITORY" --name firmware-candidate-6-1 --dir artifacts/ui-firmware
+          (cd artifacts/ui-sdk && sha256sum -c SHA256SUMS)
+          (cd artifacts/ui-firmware && sha256sum -c SHA256SUMS)
+      - name: Install isolated test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 zstd
+          python3 -m venv .ci-venv
+          .ci-venv/bin/pip install playwright==1.56.0
+          .ci-venv/bin/python -m playwright install --with-deps chromium
+      - name: Package UI update
+        run: |
+          tar --zstd -xf artifacts/ui-sdk/openwrt-sdk-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst -C artifacts/ui-sdk
+          sudo .ci-venv/bin/python scripts/build_ui_addon.py --sdk artifacts/ui-sdk/openwrt-sdk-x86-64_gcc-14.3.0_musl.Linux-x86_64 --output artifacts/ui-bundle
+      - name: Verify real firmware installation and browser pages
+        run: .ci-venv/bin/python scripts/smoke_ui.py artifacts/ui-firmware artifacts/ui-bundle artifacts/ui-evidence
+      - name: Save evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: home-ui-evidence-0.2.0-${{ github.run_id }}
+          path: artifacts/ui-evidence/
+          retention-days: 30
+      - name: Save installable update
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: home-ui-update-0.2.0-${{ github.run_id }}
+          path: artifacts/ui-bundle/
+          retention-days: 30
